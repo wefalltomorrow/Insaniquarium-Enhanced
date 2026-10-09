@@ -106,6 +106,11 @@ public:
             LogEvent("ERROR", "invalid_interpolation_factor", blend);
         if (observations.size() > 10000) observations.clear();
     }
+    void PauseTransition(bool isPaused) {
+        if (!active) return;
+        LogEvent("INFO", isPaused ? "tank_paused" : "tank_resumed",
+                 isPaused ? 1.0 : 0.0, 0.0, false);
+    }
     void SimTick() { if (active) ++ticks; }
     void Updated(Kind kind) {
         if (active) ++update[kind];
