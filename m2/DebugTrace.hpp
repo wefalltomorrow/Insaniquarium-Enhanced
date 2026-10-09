@@ -31,9 +31,11 @@ class Recorder {
     FILE* objects = nullptr;
     FILE* sprites = nullptr;
     FILE* interp = nullptr;
+    FILE* invalidSprites = nullptr;
     FILE* events = nullptr;
     unsigned long long frame = 0, ticks = 0;
     unsigned long long totalEvents = 0, totalTrace = 0;
+    unsigned long long lastReportedTick = 0, invalidRows = 0;
     unsigned update[Kinds] = {}, draw[Kinds] = {};
     unsigned spriteCount = 0, invalidSpriteCount = 0, celChanges = 0;
     unsigned currentWarnings = 0;
@@ -75,6 +77,7 @@ public:
         if (objects) std::fclose(objects);
         if (sprites) std::fclose(sprites);
         if (interp) std::fclose(interp);
+        if (invalidSprites) std::fclose(invalidSprites);
         if (events) std::fclose(events);
     }
     bool Active() const { return active; }
@@ -82,17 +85,19 @@ public:
         if (!active || opened) return;
         opened = true;
         frames = Open("M2DebugFrames.csv",
-            "frame,ticks,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings\n");
+            "frame,scheduledTicks,actualTicksSincePreviousPresent,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings\n");
         objects = Open("M2DebugObjects.csv",
             "frame,gameTick,kind,objectId,simulationX,simulationY,animationCel,changedCel,simMoved,repeatDraw,simTicksSinceLastDraw\n");
         sprites = Open("M2DebugSprites.csv",
             "frame,gameTick,imageId,celColumn,celRow,drawX,drawY\n");
         interp = Open("M2DebugInterpolation.csv",
             "frame,gameTick,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend\n");
+        invalidSprites = Open("M2DebugInvalidSprites.csv",
+            "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !events)
+        if (!frames || !objects || !sprites || !interp || !invalidSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
     }
 
@@ -161,13 +166,31 @@ public:
     }
 
     void SpriteCel(const void* image, int col, int row, int x, int y,
-                   int maxCols, int maxRows) {
+                   int maxCols, int maxRows, int width, int height,
+                   const std::string& assetPath) {
         if (!active) return;
         ++spriteCount;
         if (col < 0 || row < 0 || col >= maxCols || row >= maxRows) {
             ++invalidSpriteCount;
             if (invalidSpriteCount <= 3)
                 LogEvent("WARN", "invalid_sprite_cel", col, row);
+            // Preserve the image identifier and asset path rather than
+            // guessing which gameplay animation supplied an invalid cel.
+            if (invalidSprites && invalidRows < 50000) {
+                std::string safePath = assetPath.empty() ? "<unnamed image>" : assetPath;
+                // Keep one CSV record per invalid call, with no newline or
+                // comma injection from a surprising resource filename.
+                for (char& ch : safePath)
+                    if (ch == '"' || ch == '\r' || ch == '\n' || ch == ',')
+                        ch = '_';
+                std::fprintf(invalidSprites,
+                    "%llu,%llu,%llu,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",
+                    frame, ticks,
+                    static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(image)),
+                    safePath.c_str(), width, height, maxCols, maxRows,
+                    col, row, x, y);
+                ++invalidRows;
+            }
         }
         if (sprites && totalTrace < kTraceRowLimit &&
             perFrameSprites++ < kSpritesPerFrame && (frame % 2) == 0) {
@@ -195,12 +218,14 @@ public:
             LogEvent("WARN", "slow_render_ms", renderMs);
         if (frames)
             std::fprintf(frames,
-                "%llu,%d,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
-                frame, simSteps, ticks, requested, presented, elapsed,
+                "%llu,%d,%llu,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+                frame, simSteps, ticks - lastReportedTick, ticks,
+                requested, presented, elapsed,
                 renderMs, blend, update[Board], update[Fish], update[Coin],
                 update[Food], update[Alien], draw[Board], draw[Fish],
                 draw[Coin], draw[Food], draw[Alien], spriteCount,
                 invalidSpriteCount, celChanges, currentWarnings);
+        lastReportedTick = ticks;
         ++frame;
         for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
         spriteCount = invalidSpriteCount = celChanges = 0;
@@ -212,6 +237,7 @@ public:
             if (objects) std::fflush(objects);
             if (sprites) std::fflush(sprites);
             if (interp) std::fflush(interp);
+            if (invalidSprites) std::fflush(invalidSprites);
             if (events) std::fflush(events);
             for (auto it = observations.begin(); it != observations.end();) {
                 if (frame > it->second.frame + 1200) it = observations.erase(it);
