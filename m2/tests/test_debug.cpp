@@ -23,7 +23,8 @@ int main() {
     diag.Updated(M2Debug::Fish);
     const int id = 7;
     diag.Drawn(M2Debug::Fish, &id, 12, 20, 3);
-    diag.SpriteCel(&id, 1, 0, 12, 20, 8, 8);
+    diag.SpriteCel(&id, 1, 0, 12, 20, 8, 8, 256, 256, "images/test_sheet.png");
+    diag.SpriteCel(&id, -1, 0, 12, 20, 8, 8, 256, 256, "images/test_sheet.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
     diag.Begin(16.67, 0.8, 0);
@@ -48,5 +49,14 @@ int main() {
     Verify(interp != nullptr, "interpolation output exists");
     std::fclose(interp);
 
-    std::puts("PASS debug recorder counters, sprite sampling, CSV traces and title");
+    FILE* invalid = std::fopen("M2DebugInvalidSprites.csv", "rb");
+    Verify(invalid != nullptr, "invalid sprite details file exists");
+    char record[512] = {};
+    Verify(std::fgets(record, sizeof(record), invalid) != nullptr, "invalid file CSV header");
+    Verify(std::fgets(record, sizeof(record), invalid) != nullptr, "invalid file CSV data");
+    Verify(std::strstr(record, "images/test_sheet.png") != nullptr, "asset path appears in invalid sprite trace");
+    Verify(std::strstr(record, ",-1,0,12,20") != nullptr, "invalid cel numbers appear in trace");
+    std::fclose(invalid);
+
+    std::puts("PASS M2 debug timing, animation and named invalid sprite traces");
 }
