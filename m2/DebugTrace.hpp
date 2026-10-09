@@ -32,12 +32,13 @@ class Recorder {
     FILE* sprites = nullptr;
     FILE* interp = nullptr;
     FILE* invalidSprites = nullptr;
+    FILE* skippedSprites = nullptr;
     FILE* events = nullptr;
     unsigned long long frame = 0, ticks = 0;
     unsigned long long totalEvents = 0, totalTrace = 0;
-    unsigned long long lastReportedTick = 0, invalidRows = 0;
+    unsigned long long lastReportedTick = 0, invalidRows = 0, skippedRows = 0;
     unsigned update[Kinds] = {}, draw[Kinds] = {};
-    unsigned spriteCount = 0, invalidSpriteCount = 0, celChanges = 0;
+    unsigned spriteCount = 0, invalidSpriteCount = 0, skippedSpriteCount = 0, celChanges = 0;
     unsigned currentWarnings = 0;
     unsigned perFrameObjects = 0, perFrameSprites = 0;
     unsigned lastSecondWarnings = 0;
@@ -78,6 +79,7 @@ public:
         if (sprites) std::fclose(sprites);
         if (interp) std::fclose(interp);
         if (invalidSprites) std::fclose(invalidSprites);
+        if (skippedSprites) std::fclose(skippedSprites);
         if (events) std::fclose(events);
     }
     bool Active() const { return active; }
@@ -85,7 +87,7 @@ public:
         if (!active || opened) return;
         opened = true;
         frames = Open("M2DebugFrames.csv",
-            "frame,scheduledTicks,actualTicksSincePreviousPresent,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings\n");
+            "frame,scheduledTicks,actualTicksSincePreviousPresent,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings,expectedSkippedCels\n");
         objects = Open("M2DebugObjects.csv",
             "frame,gameTick,kind,objectId,simulationX,simulationY,animationCel,changedCel,simMoved,repeatDraw,simTicksSinceLastDraw\n");
         sprites = Open("M2DebugSprites.csv",
@@ -94,10 +96,12 @@ public:
             "frame,gameTick,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
             "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
+        skippedSprites = Open("M2DebugSkippedSprites.csv",
+            "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !invalidSprites || !events)
+        if (!frames || !objects || !sprites || !interp || !invalidSprites || !skippedSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
     }
 
@@ -171,25 +175,33 @@ public:
         if (!active) return;
         ++spriteCount;
         if (col < 0 || row < 0 || col >= maxCols || row >= maxRows) {
-            ++invalidSpriteCount;
-            if (invalidSpriteCount <= 3)
-                LogEvent("WARN", "invalid_sprite_cel", col, row);
-            // Preserve the image identifier and asset path rather than
-            // guessing which gameplay animation supplied an invalid cel.
-            if (invalidSprites && invalidRows < 50000) {
+            // Original graphics code intentionally ignores negative cels.
+            // Meryl's blinking overlay and the first chomp-effect frame
+            // both use -1 as a normal "do not draw" sentinel.
+            const bool expectedSkip = col == -1 && row == 0 &&
+                (assetPath == "images/merylblink" ||
+                 assetPath == "images/chomp");
+            if (expectedSkip)
+                ++skippedSpriteCount;
+            else {
+                ++invalidSpriteCount;
+                if (invalidSpriteCount <= 3)
+                    LogEvent("WARN", "invalid_sprite_cel", col, row);
+            }
+            FILE* detail = expectedSkip ? skippedSprites : invalidSprites;
+            unsigned long long& count = expectedSkip ? skippedRows : invalidRows;
+            if (detail && count < 50000) {
                 std::string safePath = assetPath.empty() ? "<unnamed image>" : assetPath;
-                // Keep one CSV record per invalid call, with no newline or
-                // comma injection from a surprising resource filename.
                 for (char& ch : safePath)
                     if (ch == '"' || ch == '\r' || ch == '\n' || ch == ',')
                         ch = '_';
-                std::fprintf(invalidSprites,
+                std::fprintf(detail,
                     "%llu,%llu,%llu,%s,%d,%d,%d,%d,%d,%d,%d,%d\n",
                     frame, ticks,
                     static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(image)),
                     safePath.c_str(), width, height, maxCols, maxRows,
                     col, row, x, y);
-                ++invalidRows;
+                ++count;
             }
         }
         if (sprites && totalTrace < kTraceRowLimit &&
@@ -218,17 +230,18 @@ public:
             LogEvent("WARN", "slow_render_ms", renderMs);
         if (frames)
             std::fprintf(frames,
-                "%llu,%d,%llu,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+                "%llu,%d,%llu,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
                 frame, simSteps, ticks - lastReportedTick, ticks,
                 requested, presented, elapsed,
                 renderMs, blend, update[Board], update[Fish], update[Coin],
                 update[Food], update[Alien], draw[Board], draw[Fish],
                 draw[Coin], draw[Food], draw[Alien], spriteCount,
-                invalidSpriteCount, celChanges, currentWarnings);
+                invalidSpriteCount, celChanges, currentWarnings,
+                skippedSpriteCount);
         lastReportedTick = ticks;
         ++frame;
         for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
-        spriteCount = invalidSpriteCount = celChanges = 0;
+        spriteCount = invalidSpriteCount = skippedSpriteCount = celChanges = 0;
         perFrameObjects = perFrameSprites = 0;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
@@ -238,6 +251,7 @@ public:
             if (sprites) std::fflush(sprites);
             if (interp) std::fflush(interp);
             if (invalidSprites) std::fflush(invalidSprites);
+            if (skippedSprites) std::fflush(skippedSprites);
             if (events) std::fflush(events);
             for (auto it = observations.begin(); it != observations.end();) {
                 if (frame > it->second.frame + 1200) it = observations.erase(it);

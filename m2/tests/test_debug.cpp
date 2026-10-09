@@ -25,6 +25,9 @@ int main() {
     diag.Drawn(M2Debug::Fish, &id, 12, 20, 3);
     diag.SpriteCel(&id, 1, 0, 12, 20, 8, 8, 256, 256, "images/test_sheet.png");
     diag.SpriteCel(&id, -1, 0, 12, 20, 8, 8, 256, 256, "images/test_sheet.png");
+    diag.SpriteCel(&id, -1, 0, 139, 196, 3, 1, 165, 25, "images/merylblink");
+    diag.SpriteCel(&id, -1, 0, 0, 0, 5, 1, 150, 30, "images/chomp");
+    diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
     diag.Begin(16.67, 0.8, 0);
@@ -56,7 +59,29 @@ int main() {
     Verify(std::fgets(record, sizeof(record), invalid) != nullptr, "invalid file CSV data");
     Verify(std::strstr(record, "images/test_sheet.png") != nullptr, "asset path appears in invalid sprite trace");
     Verify(std::strstr(record, ",-1,0,12,20") != nullptr, "invalid cel numbers appear in trace");
+    int unexpectedRows = 1;
+    while (std::fgets(record, sizeof(record), invalid) != nullptr) {
+        Verify(std::strstr(record, "merylblink") == nullptr &&
+               std::strstr(record, "chomp") == nullptr,
+               "known hidden frames must not count as invalid");
+        ++unexpectedRows;
+    }
+    Verify(unexpectedRows == 2, "unexpected negative and high cels both logged");
     std::fclose(invalid);
 
-    std::puts("PASS M2 debug timing, animation and named invalid sprite traces");
+    FILE* skipped = std::fopen("M2DebugSkippedSprites.csv", "rb");
+    Verify(skipped != nullptr, "hidden-sprite output exists");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr,
+           "skipped header exists");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/merylblink") != nullptr,
+           "Meryl intentional no-draw frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/chomp") != nullptr,
+           "Chomp intentional no-draw frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) == nullptr,
+           "only expected hidden frames are classified");
+    std::fclose(skipped);
+
+    std::puts("PASS M2 debug timing, classified hidden frames and invalid sprite traces");
 }
