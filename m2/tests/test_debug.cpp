@@ -32,6 +32,7 @@ int main() {
     diag.WindowTitle(35.7, 59.9);
     Verify(std::strstr(diag.Title(), "35.7") != nullptr, "titlebar statistics");
 
+    std::fflush(nullptr); // flush recorder streams before inspecting files
     FILE* csv = std::fopen("M2DebugFrames.csv", "rb");
     Verify(csv != nullptr, "frames output exists");
     int lines = 0, c = 0;
