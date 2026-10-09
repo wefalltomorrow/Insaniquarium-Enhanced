@@ -44,8 +44,14 @@ public:
             mSimulationMs = std::fmod(mSimulationMs, kSimulationMs);
 
         result.present = (mPresentationMs + 1e-9 >= kPresentationMs);
-        if (result.present)
-            mPresentationMs = std::fmod(mPresentationMs, kPresentationMs);
+        if (result.present) {
+            // Subtract the frame we actually presented FIRST. fmod alone
+            // leaves a nearly-complete interval intact when the epsilon
+            // allowed a borderline frame, causing extra presents at 144 Hz.
+            mPresentationMs = std::fmod(
+                std::max(0.0, mPresentationMs - kPresentationMs),
+                kPresentationMs);
+        }
 
         result.blend = std::clamp(mSimulationMs / kSimulationMs, 0.0, 1.0);
         return result;
