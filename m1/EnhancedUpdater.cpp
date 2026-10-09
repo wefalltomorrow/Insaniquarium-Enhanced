@@ -207,16 +207,16 @@ std::string latestDownload;
 
 } // namespace
 
-void EnhancedUpdater::Start(Sexy::WinFishApp* app) {
+void EnhancedUpdater::Start(PopLib::WinFishApp* app) {
     if (!app || pending.valid()) return;
     latestDownload.clear();
     pending = std::async(std::launch::async, Check);
     app->DoDialog(kChecking, true, "Checking for Updates",
                   "Checking GitHub for a newer build...",
-                  "Cancel", Sexy::Dialog::BUTTONS_FOOTER);
+                  "Cancel", PopLib::Dialog::BUTTONS_FOOTER);
 }
 
-void EnhancedUpdater::Pump(Sexy::WinFishApp* app) {
+void EnhancedUpdater::Pump(PopLib::WinFishApp* app) {
     if (!app || !pending.valid() ||
         pending.wait_for(std::chrono::seconds(0)) != std::future_status::ready)
         return;
@@ -229,31 +229,31 @@ void EnhancedUpdater::Pump(Sexy::WinFishApp* app) {
     if (!r.success) {
         app->DoDialog(kUpdateAvailable + 1, true, "Update Check Failed",
                       r.error + "\n\nPlease try again later.",
-                      "OK", Sexy::Dialog::BUTTONS_FOOTER);
+                      "OK", PopLib::Dialog::BUTTONS_FOOTER);
         return;
     }
     if (!r.newer) {
         app->DoDialog(kUpdateAvailable + 2, true, "Up to Date",
                       "You have the latest Insaniquarium Enhanced build.\n\nInstalled: "
                           + std::string(kCurrentVersion),
-                      "OK", Sexy::Dialog::BUTTONS_FOOTER);
+                      "OK", PopLib::Dialog::BUTTONS_FOOTER);
         return;
     }
 
     latestDownload = r.download;
-    Sexy::Dialog* d = app->DoDialog(
+    PopLib::Dialog* d = app->DoDialog(
         kUpdateAvailable, true, "Update Available",
         "Installed: " + std::string(kCurrentVersion)
             + "\nAvailable: " + r.tag
             + "\n\nDownload the new build?",
-        "", Sexy::Dialog::BUTTONS_YES_NO);
+        "", PopLib::Dialog::BUTTONS_YES_NO);
     if (d && d->mYesButton && d->mNoButton) {
         d->mYesButton->mLabel = "Download";
         d->mNoButton->mLabel = "Later";
     }
 }
 
-void EnhancedUpdater::Download(Sexy::WinFishApp* app) {
+void EnhancedUpdater::Download(PopLib::WinFishApp* app) {
     if (!app || latestDownload.empty()) return;
     const std::string url = latestDownload;
     latestDownload.clear();
