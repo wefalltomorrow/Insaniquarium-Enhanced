@@ -78,6 +78,10 @@ def main(tag: str) -> None:
          '    if (theId == 2090) { // Cancel the "Checking..." dialog\n'
          '        KillDialog(90);\n'
          '        return;\n'
+         '    }\n'
+         '    if (theId == 2092 || theId == 2093) { // Error / Up-to-date OK\n'
+         '        KillDialog(theId - 2000);\n'
+         '        return;\n'
          '    }\n',
          "route Download/Cancel decisions"),
         ('void PopLib::WinFishApp::UpdateFrames()\n{\n',
