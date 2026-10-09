@@ -1,30 +1,51 @@
 # Insaniquarium Enhanced
 
-A Windows x64 rebuild of **Insaniquarium! Deluxe** using the [WinFish decompilation](https://github.com/Vindirect/WinFish) and the [SaMeiers native SDL3/PopLib port](https://github.com/SaMeiers/insaniquarium-port).
+A modern Windows x64 build of **Insaniquarium! Deluxe**, based on the community [WinFish decompilation](https://github.com/Vindirect/WinFish) and [SaMeiers' SDL3/PopLib native port](https://github.com/SaMeiers/insaniquarium-port). No executable hooking or proxy DLL patches.
 
-## Current milestone: M0
+## Downloads
 
-M0 is the **native x64 baseline**. It builds the decompiled game with SDL3 and fixes already present in the upstream native port. It is **not yet a native 4K or independent 60 FPS renderer**, and no such feature is claimed for this build.
+| Release | Game source | Status |
+| --- | --- | --- |
+| [M1 preview (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.0-m1-preview) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Native compilation verified; gameplay testing required |
+| [M0 (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.1.0-m0) | WinFish [61ddba1](https://github.com/Vindirect/WinFish/commit/61ddba10056621c7857ea6f822139c39c76a4019), March 13, 2026 | Original known-compatible port baseline |
 
-The source is fetched in the GitHub Actions workflow with submodules, preserving the upstream port's *known-compatible* WinFish revision. Updating to the latest game decompilation is planned after the baseline compiles and launches.
+Both are **pre-releases**: Windows x64 compilation, binary architecture and ZIP packaging passed automated checks, but this does not establish that every game mode works at runtime.
 
-### Get the game
+### What's different in M1?
 
-See [Releases](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases) for Windows builds. The ZIP contains the game executable and any required runtime libraries, **not the copyrighted game artwork, sound or music**. To play, copy the `data`, `images`, `music`, `properties`, `sounds`, and `fishsongs` directories from your purchased Insaniquarium Deluxe installation next to `InsaniquariumEnhanced.exe`. The game has not been runtime-tested until someone launches it with those files.
+M1 updates the game code to the latest WinFish revision used in the build, **32 commits newer than M0**, including upstream bug fixes for Virtual Tank, fish behaviour, bonuses and coins. It retains SaMeiers' Windows/SDL3 integration, game fixes and the PopLib framework. Two already-fixed fish-song applause patches are safely omitted after checking the current source; all other upstream port fixes remain enforced.
 
-### Build
+The game uses its original 28 ms simulation interval. **Neither M1 nor M0 currently includes independent 60 FPS rendering, native 4K framebuffer rendering or MSAA.** SDL3 scales the original 640x480 presentation into modern resizable/fullscreen windows. Scaling alone does not create native-resolution detail.
 
-The workflow at [`.github/workflows/windows.yml`](.github/workflows/windows.yml) builds on **Windows Server 2022 / Visual Studio 2022** and generates `InsaniquariumEnhanced-M0-Win64.zip` from the upstream source. Manual build requirements are Visual Studio 2022, CMake 3.26+, Git Bash and Python 3.
+## Install
 
-A successful workflow can publish a GitHub **pre-release** only after compiling and inspecting the x64 executable. It also uploads the packaged executable as a workflow artifact.
+1. Download and extract a Windows x64 release ZIP.
+2. Copy `data`, `images`, `music`, `properties`, `sounds`, and `fishsongs` from your own copy of Insaniquarium Deluxe (Steam/GOG) into the folder next to `InsaniquariumEnhanced.exe`.
+3. Launch `InsaniquariumEnhanced.exe`.
 
-### Source, credits and licence
+**No original PopCap game assets are distributed by this project.** Existing save data should be backed up before testing pre-releases.
 
-- [Vindirect/WinFish](https://github.com/Vindirect/WinFish): reverse-engineered game source
-- [SaMeiers/insaniquarium-port](https://github.com/SaMeiers/insaniquarium-port): portable SDL3/PopLib integration, builds and gameplay fixes
-- [SaMeiers/PopLib](https://github.com/SaMeiers/PopLib): enhanced framework
-- [Team PopWork](https://github.com/teampopwork/PopLib): upstream PopLib project
+## Development
 
-The port and modified framework are AGPL-3.0 licensed; the original PopCap framework license and third-party notices still apply. See [the port license](https://github.com/SaMeiers/insaniquarium-port/blob/main/LICENSE) and its dependency notices. **Original commercial game assets are not distributed.**
+- [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
+- [Source reconciliation script](m1/prepare_source.py): verifies the newer WinFish applause fix and retains all remaining upstream port patches
+- [M0 build workflow](.github/workflows/windows.yml): original pinned baseline
 
-This project is independent, unaffiliated with PopCap or EA.
+Every release pins the game and port revisions for reproducibility. Builds download source and dependencies through GitHub Actions rather than copying proprietary files or including old executable patches.
+
+### Next
+
+- Verify the new source in Adventure, Time Trial and Virtual Tank, including music and save/load
+- Test mouse and cursor coordinates with window resize, maximize, DPI scaling and multiple monitors
+- Decouple rendering from the 28 ms game simulation and add render-only motion interpolation
+- Add a true high-resolution rendering target and test AA/texture filtering without stretching, cropping or changing input coordinates
+
+Window/DPI improvements are being developed and compiled separately, so experimental changes do not replace the baseline unless they pass testing.
+
+## Credits and licence
+
+- [Vindirect/WinFish](https://github.com/Vindirect/WinFish): original reverse-engineered game code
+- [SaMeiers/insaniquarium-port](https://github.com/SaMeiers/insaniquarium-port): SDL3/PopLib port and compatibility/gameplay fixes
+- [SaMeiers/PopLib](https://github.com/SaMeiers/PopLib) and [Team PopWork/PopLib](https://github.com/teampopwork/PopLib): framework and improvements
+
+Our port-related work is distributed under [AGPL-3.0](LICENSE), reflecting the upstream port and framework. Original PopCap framework and third-party licences continue to apply. Insaniquarium Deluxe and its assets belong to their respective owners. This project is unaffiliated with PopCap or EA.
