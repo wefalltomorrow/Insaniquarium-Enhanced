@@ -1,4 +1,4 @@
-name: M1.1 Windows x64 (latest WinFish)
+name: M1.2 Windows x64 (latest WinFish)
 
 on:
   push:
@@ -19,8 +19,8 @@ jobs:
     env:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
-      RELEASE_TAG: v0.2.1-m1-menu
-      RELEASE_ASSET: InsaniquariumEnhanced-M1.1-Win64.zip
+      RELEASE_TAG: v0.2.2-m1-update
+      RELEASE_ASSET: InsaniquariumEnhanced-M1.2-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -90,6 +90,13 @@ jobs:
           python m1/menu_updates.py
           if ($LASTEXITCODE -ne 0) { throw 'Options menu patch failed' }
 
+      - name: Install in-game GitHub release updater
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/apply_updater.py $env:RELEASE_TAG
+          if ($LASTEXITCODE -ne 0) { throw 'Enhanced updater patch failed' }
+
       - name: Generate missing libopenmpt version metadata
         shell: pwsh
         run: |
@@ -144,7 +151,7 @@ jobs:
           New-Item -ItemType Directory -Path stage -Force | Out-Null
           Copy-Item $exe 'stage/InsaniquariumEnhanced.exe'
           @'
-          Insaniquarium Enhanced M1.1 preview - Windows x64 (updated game decomp)
+          Insaniquarium Enhanced M1.2 preview - Windows x64 (updated game decomp)
 
           This executable is compiled from the original WinFish decompilation
           using SaMeiers' native SDL3/PopLib port.
@@ -155,8 +162,10 @@ jobs:
             data, images, music, properties, sounds, fishsongs
 
           Original PopCap assets are NOT contained in this archive.
+          CHECK UPDATES compares this build with GitHub published releases
+          and offers a ZIP download when a newer Windows x64 build exists.
 
-          M1.1 preview uses WinFish f919b3c (8 Oct 2026); native 4K and
+          M1.2 preview uses WinFish f919b3c (8 Oct 2026); native 4K and
           independent 60 FPS rendering are not yet implemented.
           Windows x64 executable architecture and compilation are CI-verified,
           but runtime gameplay has not been verified by CI.
@@ -185,8 +194,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M1.1-Win64
-          path: release/InsaniquariumEnhanced-M1.1-Win64.zip
+          name: InsaniquariumEnhanced-M1.2-Win64
+          path: release/InsaniquariumEnhanced-M1.2-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -198,13 +207,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          M1.1 WinFish-source with cleaned Options menu Windows x64 preview, compiled from the
+          M1.2 WinFish-source with cleaned Options menu Windows x64 preview, compiled from the
           WinFish decompilation through SaMeiers' SDL3/PopLib Windows port.
 
           - Native x64 PE build verified in GitHub Actions.
           - Requires assets from a purchased Insaniquarium Deluxe installation.
-          - M1 previously reported launching and running by a tester at ~36 FPS. M1.1 menu changes need in-game verification.
-          - Full Hardware Acceleration label, no Register button, GitHub Releases update link.\n          - Latest WinFish bug fixes; no native 4K rendering, 60 FPS interpolation, or old proxy-DLL patching yet.
+          - M1 previously reported launching and running by a tester at ~36 FPS. M1.2 update checks need in-game verification.
+          - In-game update check compares installed tag against published GitHub Releases (including previews) and prompts to download newer x64 builds.
+          - Full Hardware Acceleration label and no Register button.
+          - Latest WinFish bug fixes; no native 4K rendering, 60 FPS interpolation, or old proxy-DLL patching yet.
 
           Credits and source revisions: see the repository README and the bundled README.txt.
           '@
@@ -214,6 +225,6 @@ jobs:
             gh release upload $env:RELEASE_TAG $asset --clobber --repo $env:GITHUB_REPOSITORY
             if ($LASTEXITCODE -ne 0) { throw 'Could not update release asset' }
           } else {
-            gh release create $env:RELEASE_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M1.1 preview (Windows x64)' --notes $notes --prerelease
+            gh release create $env:RELEASE_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M1.2 preview (Windows x64)' --notes $notes --prerelease
             if ($LASTEXITCODE -ne 0) { throw 'Could not create GitHub pre-release' }
           }
