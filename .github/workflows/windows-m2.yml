@@ -258,7 +258,7 @@ jobs:
       - name: Publish experimental ZIP for direct download
         shell: pwsh
         env:
-          GH_TOKEN: {{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
