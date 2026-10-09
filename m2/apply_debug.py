@@ -130,7 +130,9 @@ def main() -> None:
     ):
         new = (sig + '\n\tif (M2Debug::Get().Active() && theImageStrip)\n'
                '\t\tM2Debug::Get().SpriteCel(theImageStrip, theCelCol, theCelRow, '
-               f'{x}, {y}, theImageStrip->mNumCols, theImageStrip->mNumRows);')
+               f'{x}, {y}, theImageStrip->mNumCols, theImageStrip->mNumRows, '
+               'theImageStrip->mWidth, theImageStrip->mHeight, '
+               'theImageStrip->mFilePath);')
         change(graphics, sig, new, f"trace {n}")
     print("[ok] M2 diagnostics are opt-in and do not modify game-state paths")
 
