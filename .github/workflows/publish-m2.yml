@@ -1,0 +1,81 @@
+name: Publish M2 experimental ZIP download
+
+on:
+  push:
+    branches: [feature/m2-fixed-timestep]
+    paths:
+      - ".github/workflows/publish-m2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    name: Publish existing verified M2 test ZIP
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: wefalltomorrow/Insaniquarium-Enhanced
+      SOURCE_RUN: 37926652619
+      SOURCE_COMMIT: 1ec476f43357af7e85fdc16937f8d3ef7d8b3e35
+      RELEASE_TAG: m2-test-20261009
+      ASSET: InsaniquariumEnhanced-M2Test-Win64.zip
+    steps:
+      - name: Retrieve successful Windows test build
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh run download "$SOURCE_RUN" --repo "$REPO" --name InsaniquariumEnhanced-M2Test-Win64 --dir release
+          test -s "release/$ASSET"
+
+      - name: Verify executable and opt-in launcher
+        run: |
+          set -euo pipefail
+          unzip -t "release/$ASSET" | tail -3
+          unzip -Z1 "release/$ASSET" | grep -Fx 'InsaniquariumEnhanced.exe'
+          unzip -Z1 "release/$ASSET" | grep -Fx 'Start M2.cmd'
+          unzip -Z1 "release/$ASSET" | grep -Fx 'M2_README.txt'
+          sha256sum "release/$ASSET"
+
+      - name: Write experimental release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## M2 experimental 60 FPS timing test (Windows x64)
+
+          **Download the ZIP below.** This is the exact Windows x64 build that passed the [M2 workflow](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/actions/runs/37926652619), republished here for a normal, one-click download.
+
+          ### Instructions
+          1. Extract the ZIP into a **separate test folder**.
+          2. Copy these six folders from your original Insaniquarium Deluxe installation alongside the EXE: `data`, `images`, `music`, `properties`, `sounds`, `fishsongs`.
+          3. Double-click **`Start M2.cmd`** to enable the experimental 60 Hz presentation path.
+          4. Play for 15–30 seconds, then share **`M2Timing.log`** and the FPS reported by your overlay.
+
+          Launching `InsaniquariumEnhanced.exe` directly uses the original 28 ms timing path instead.
+
+          **Current limitations:** This is an opt-in *test*, not finished 60 FPS support. Only fish have render-only movement interpolation; food, coins, aliens and other effects still draw on their original logic cadence. Runtime gameplay, music, save/load, input, actual smoothness and timing need testing. Do not overwrite your working M1.2 folder.
+
+          The M2 clock's standalone CI tests passed at simulated refresh rates of 60, 120, 144, 165 and 240 Hz. The compiled x64 executable and ZIP were checked by CI; **no gameplay runtime test has been performed yet**.
+
+          This experimental release uses a non-version tag so that M1.2's built-in update checker **does not** mistakenly recommend it as a stable update. M1.2 remains the recommended baseline.
+
+          Source: [M2 draft PR #5](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/pull/5) · Commit `1ec476f`.
+          EOF
+
+      - name: Publish direct GitHub Releases download
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "release/$ASSET" --repo "$REPO" --clobber
+            gh release edit "$RELEASE_TAG" --repo "$REPO" --prerelease --notes-file release-notes.md
+          else
+            gh release create "$RELEASE_TAG" "release/$ASSET" \
+              --repo "$REPO" \
+              --target "$SOURCE_COMMIT" \
+              --title "Insaniquarium Enhanced M2 — Experimental 60 FPS Test" \
+              --prerelease \
+              --notes-file release-notes.md
+          fi
+          echo "## Easy M2 download" >> "$GITHUB_STEP_SUMMARY"
+          echo "[Download the M2 test ZIP](https://github.com/$REPO/releases/download/$RELEASE_TAG/$ASSET)" >> "$GITHUB_STEP_SUMMARY"
