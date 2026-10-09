@@ -4,6 +4,7 @@
 #include "EnhancedUpdaterVersion.h"
 #include "WinFishApp.h"
 #include <PopLib/widget/dialog.hpp>
+#include <PopLib/widget/dialogbutton.hpp>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
