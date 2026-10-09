@@ -42,8 +42,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Unable to clone native port' }
           git -C upstream checkout $env:PORT_COMMIT
           if ($LASTEXITCODE -ne 0) { throw 'Unable to select tested native port revision' }
-          git -C upstream submodule update --init --recursive --jobs 6
-          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch port submodules' }
+          # Do not fetch optional Discord RPC: its upstream is unavailable,
+          # and FEATURE_DISCORD_RPC is disabled for this build.
+          git -C upstream submodule update --init --jobs 6
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch game/framework submodules' }
+          $required = @(
+            'external/SDL', 'external/SDL_ttf', 'external/curl',
+            'external/miniaudio', 'external/ogg', 'external/openal',
+            'external/tinyxml2', 'external/vorbis', 'external/zlib'
+          )
+          git -C upstream/poplib submodule update --init --jobs 6 -- $required
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch required framework dependencies' }
+          # SDL_ttf keeps FreeType, HarfBuzz, etc. in its own submodules.
+          git -C upstream/poplib/external/SDL_ttf submodule update --init --recursive --jobs 4
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch font dependencies' }
           if (-not (Test-Path upstream/external/winfish/source/WinFish/WinFishApp.cpp)) { throw 'WinFish source missing' }
           if (-not (Test-Path upstream/poplib/PopLib/appbase.cpp)) { throw 'PopLib source missing' }
 
