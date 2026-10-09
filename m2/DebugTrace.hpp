@@ -30,6 +30,7 @@ class Recorder {
     FILE* frames = nullptr;
     FILE* objects = nullptr;
     FILE* sprites = nullptr;
+    FILE* interp = nullptr;
     FILE* events = nullptr;
     unsigned long long frame = 0, ticks = 0;
     unsigned long long totalEvents = 0, totalTrace = 0;
@@ -73,6 +74,7 @@ public:
         if (frames) std::fclose(frames);
         if (objects) std::fclose(objects);
         if (sprites) std::fclose(sprites);
+        if (interp) std::fclose(interp);
         if (events) std::fclose(events);
     }
     bool Active() const { return active; }
@@ -85,22 +87,19 @@ public:
             "frame,gameTick,kind,objectId,simulationX,simulationY,animationCel,changedCel,simMoved,repeatDraw,simTicksSinceLastDraw\n");
         sprites = Open("M2DebugSprites.csv",
             "frame,gameTick,imageId,celColumn,celRow,drawX,drawY\n");
+        interp = Open("M2DebugInterpolation.csv",
+            "frame,gameTick,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend\n");
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !events)
+        if (!frames || !objects || !sprites || !interp || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
     }
 
     void Begin(double elapsedMs, double blend, int simSteps) {
         if (!active) return;
         Start();
-        ++frame;
         lastFrameMs = elapsedMs;
-        for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
-        spriteCount = invalidSpriteCount = celChanges = 0;
-        perFrameObjects = perFrameSprites = 0;
-        currentWarnings = 0;
         if (elapsedMs > 65.0)
             LogEvent("WARN", "long_scheduler_gap_ms", elapsedMs, simSteps);
         if (blend < -0.0001 || blend > 1.0001)
@@ -141,13 +140,19 @@ public:
         previous = {x, y, cel, ticks, frame, true};
     }
 
-    void RenderOffset(const void* object, double dx, double dy, double blend) {
+    void RenderOffset(const void* object, double simX, double simY,
+                      double dx, double dy, double blend) {
         if (!active || !events || totalEvents >= 20000) return;
         if (!std::isfinite(dx) || !std::isfinite(dy))
             LogEvent("ERROR", "nonfinite_fish_render_offset", dx, dy);
         if (std::abs(dx) > 50.0 || std::abs(dy) > 50.0)
             LogEvent("WARN", "large_fish_interpolation_offset", dx, dy);
-        (void)object; (void)blend;
+        if (interp && totalTrace < kTraceRowLimit && perFrameObjects < kObjectsPerFrame) {
+            std::fprintf(interp, "%llu,%llu,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.5f\n",
+                         frame, ticks, static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(object)),
+                         simX, simY, simX + dx, simY + dy, dx, dy, blend);
+            ++totalTrace;
+        }
     }
 
     void SpriteCel(const void* image, int col, int row, int x, int y,
@@ -191,10 +196,17 @@ public:
                 update[Food], update[Alien], draw[Board], draw[Fish],
                 draw[Coin], draw[Food], draw[Alien], spriteCount,
                 invalidSpriteCount, celChanges, currentWarnings);
+        ++frame;
+        for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
+        spriteCount = invalidSpriteCount = celChanges = 0;
+        perFrameObjects = perFrameSprites = 0;
+        lastSecondWarnings += currentWarnings;
+        currentWarnings = 0;
         if ((frame % 300) == 0) {
             if (frames) std::fflush(frames);
             if (objects) std::fflush(objects);
             if (sprites) std::fflush(sprites);
+            if (interp) std::fflush(interp);
             if (events) std::fflush(events);
             for (auto it = observations.begin(); it != observations.end();) {
                 if (frame > it->second.frame + 1200) it = observations.erase(it);
@@ -208,7 +220,8 @@ public:
         lastPresentRate = presentHz;
         std::snprintf(title, sizeof(title),
             "Insaniquarium Enhanced [M2 DEBUG] sim %.1f Hz | render %.1f FPS | warnings %u",
-            simHz, presentHz, currentWarnings);
+            simHz, presentHz, lastSecondWarnings);
+        lastSecondWarnings = 0;
         if (simHz > 0 && (simHz < 32.0 || simHz > 39.0))
             LogEvent("WARN", "simulation_rate_out_of_range", simHz);
         if (presentHz > 0 && presentHz < 52.0)
