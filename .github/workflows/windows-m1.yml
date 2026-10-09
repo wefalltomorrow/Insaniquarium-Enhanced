@@ -2,7 +2,7 @@ name: M1 Windows x64 (latest WinFish)
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/sdl3-window-input]
     paths:
       - ".github/workflows/windows-m1.yml"
       - "m1/**"
@@ -95,6 +95,13 @@ jobs:
           #pragma once
           #define OPENMPT_VERSION_REVISION 0
           '@ | Set-Content -Path (Join-Path $folder 'svn_version.h') -Encoding ascii
+
+      - name: Apply experimental Windows display and input improvements
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/window_input.py
+          if ($LASTEXITCODE -ne 0) { throw 'SDL3 window patches failed verification' }
 
       - name: Configure Windows x64 Release
         shell: pwsh
