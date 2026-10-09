@@ -1,9 +1,9 @@
 #pragma once
 
-namespace Sexy { class WinFishApp; }
+namespace PopLib { class WinFishApp; }
 
 namespace EnhancedUpdater {
-    void Start(Sexy::WinFishApp* app);
-    void Pump(Sexy::WinFishApp* app);
-    void Download(Sexy::WinFishApp* app);
+    void Start(PopLib::WinFishApp* app);
+    void Pump(PopLib::WinFishApp* app);
+    void Download(PopLib::WinFishApp* app);
 }
