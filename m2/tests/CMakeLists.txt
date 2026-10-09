@@ -7,3 +7,5 @@ add_executable(M2FrameClockTest test_frame_clock.cpp)
 add_executable(M2DebugTraceTest test_debug.cpp)
 
 add_executable(M2PauseInterpolationTest test_pause.cpp)
+
+add_executable(M2EscapePolicyTest test_escape.cpp)
