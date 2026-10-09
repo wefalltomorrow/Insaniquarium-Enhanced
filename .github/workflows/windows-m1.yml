@@ -63,6 +63,13 @@ jobs:
           if (-not (Test-Path upstream/external/winfish/source/WinFish/WinFishApp.cpp)) { throw 'WinFish source missing' }
           if (-not (Test-Path upstream/poplib/PopLib/appbase.cpp)) { throw 'PopLib source missing' }
 
+      - name: Reconcile upstream gamefix overlap
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/prepare_source.py
+          if ($LASTEXITCODE -ne 0) { throw 'Latest WinFish fix reconciliation failed' }
+
       - name: Generate portable game source
         shell: bash
         working-directory: upstream
