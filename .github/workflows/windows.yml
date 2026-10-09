@@ -72,6 +72,19 @@ jobs:
           test -f port/winfish/WinFishApp.cpp
           test -f port/winfish/Board.cpp
 
+      - name: Generate missing libopenmpt version metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The vendored libopenmpt source omits its VCS-generated header.
+          # A packaged build has no SVN revision, so advertise revision zero.
+          $folder = 'upstream/poplib/external/libopenmpt/build/svn_version'
+          New-Item -Path $folder -ItemType Directory -Force | Out-Null
+          @'
+          #pragma once
+          #define OPENMPT_VERSION_REVISION 0
+          '@ | Set-Content -Path (Join-Path $folder 'svn_version.h') -Encoding ascii
+
       - name: Configure Windows x64 Release
         shell: pwsh
         run: |
