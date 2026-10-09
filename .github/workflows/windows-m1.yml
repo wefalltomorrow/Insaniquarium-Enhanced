@@ -1,0 +1,205 @@
+name: M1 Windows x64 (latest WinFish)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-m1.yml"
+      - "m1/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    name: Compile and package Insaniquarium Enhanced
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
+      WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
+      RELEASE_TAG: v0.2.0-m1-preview
+      RELEASE_ASSET: InsaniquariumEnhanced-M1-Win64.zip
+    steps:
+      - name: Checkout release workflow
+        uses: actions/checkout@v4
+
+      - name: Check compiler tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git --version
+          cmake --version
+          python --version
+          if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash is required' }
+
+      - name: Fetch upstream decomp, native port and framework
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config --global core.longpaths true
+          git clone https://github.com/SaMeiers/insaniquarium-port.git upstream
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to clone native port' }
+          git -C upstream checkout $env:PORT_COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to select tested native port revision' }
+          # Do not fetch optional Discord RPC: its upstream is unavailable,
+          # and FEATURE_DISCORD_RPC is disabled for this build.
+          git -C upstream submodule update --init --jobs 6
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch game/framework submodules' }
+          $required = @(
+            'external/SDL', 'external/SDL_ttf', 'external/curl',
+            'external/miniaudio', 'external/ogg', 'external/openal',
+            'external/tinyxml2', 'external/vorbis', 'external/zlib'
+          )
+          git -C upstream/poplib submodule update --init --jobs 6 -- $required
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch required framework dependencies' }
+          # SDL_ttf keeps FreeType, HarfBuzz, etc. in its own submodules.
+          git -C upstream/poplib/external/SDL_ttf submodule update --init --recursive --jobs 4
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch font dependencies' }
+          # Upgrade only the game source. Preserve the known-good port/framework revision.
+          git -C upstream/external/winfish checkout $env:WINFISH_COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to select latest WinFish source' }
+          if (-not (Test-Path upstream/external/winfish/source/WinFish/WinFishApp.cpp)) { throw 'WinFish source missing' }
+          if (-not (Test-Path upstream/poplib/PopLib/appbase.cpp)) { throw 'PopLib source missing' }
+
+      - name: Generate portable game source
+        shell: bash
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          bash port/port.sh 2>&1 | tee port-generate.log
+          if grep -E '\[FAILED\]|WARNING:' port-generate.log; then
+            echo 'Port generator reported failed source transformations.'
+            exit 1
+          fi
+          test -f port/winfish/WinFishApp.cpp
+          test -f port/winfish/Board.cpp
+
+      - name: Generate missing libopenmpt version metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The vendored libopenmpt source omits its VCS-generated header.
+          # A packaged build has no SVN revision, so advertise revision zero.
+          $folder = 'upstream/poplib/external/libopenmpt/build/svn_version'
+          New-Item -Path $folder -ItemType Directory -Force | Out-Null
+          @'
+          #pragma once
+          #define OPENMPT_VERSION_REVISION 0
+          '@ | Set-Content -Path (Join-Path $folder 'svn_version.h') -Encoding ascii
+
+      - name: Configure Windows x64 Release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake -S upstream/port -B upstream/port/build -G "Visual Studio 17 2022" -A x64 -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+
+      - name: Compile Windows x64 executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake --build upstream/port/build --config Release --parallel 4
+          if ($LASTEXITCODE -ne 0) { throw 'C++ compilation failed' }
+
+      - name: Verify executable and create release ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'upstream/port/bin/Insaniquarium.exe'
+          if (-not (Test-Path $exe)) { throw "Expected executable missing: $exe" }
+          if ((Get-Item $exe).Length -lt 100000) { throw 'Executable unexpectedly small' }
+
+          $stream = [System.IO.File]::OpenRead($exe)
+          try {
+            $reader = [System.IO.BinaryReader]::new($stream)
+            $stream.Position = 0x3c
+            $peOffset = $reader.ReadInt32()
+            $stream.Position = $peOffset
+            if ($reader.ReadUInt32() -ne 0x4550) { throw 'PE signature missing' }
+            $machine = $reader.ReadUInt16()
+            if ($machine -ne 0x8664) { throw ("Not a Windows x64 executable: {0:X4}" -f $machine) }
+            $stream.Position = $peOffset + 24
+            if ($reader.ReadUInt16() -ne 0x20b) { throw 'Expected PE32+ (x64) image' }
+          } finally {
+            $stream.Dispose()
+          }
+
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          New-Item -ItemType Directory -Path stage -Force | Out-Null
+          Copy-Item $exe 'stage/InsaniquariumEnhanced.exe'
+          @'
+          Insaniquarium Enhanced M1 preview - Windows x64 (updated game decomp)
+
+          This executable is compiled from the original WinFish decompilation
+          using SaMeiers' native SDL3/PopLib port.
+
+          TO PLAY:
+          Copy these directories from your own Insaniquarium Deluxe installation
+          into this folder, alongside InsaniquariumEnhanced.exe:
+            data, images, music, properties, sounds, fishsongs
+
+          Original PopCap assets are NOT contained in this archive.
+
+          M1 preview uses WinFish f919b3c (8 Oct 2026); native 4K and
+          independent 60 FPS rendering are not yet implemented.
+          Windows x64 executable architecture and compilation are CI-verified,
+          but runtime gameplay has not been verified by CI.
+
+          Source:
+          https://github.com/wefalltomorrow/Insaniquarium-Enhanced
+          https://github.com/SaMeiers/insaniquarium-port
+          https://github.com/Vindirect/WinFish
+          https://github.com/SaMeiers/PopLib
+
+          Port source revision: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
+          Game source revision: f919b3c241cfd611c547f1653fb3514f500f761b
+          Licensed source, framework and original notices: see linked repositories.
+          '@ | Set-Content -Path stage/README.txt -Encoding utf8
+          Compress-Archive -Path stage/* -DestinationPath (Join-Path 'release' $env:RELEASE_ASSET) -CompressionLevel Optimal -Force
+          $zip = Join-Path $PWD ('release/' + $env:RELEASE_ASSET)
+          $entry = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            if (-not ($entry.Entries.FullName -contains 'InsaniquariumEnhanced.exe')) {
+              throw 'Release archive contains no executable'
+            }
+          } finally { $entry.Dispose() }
+          Get-FileHash $zip -Algorithm SHA256 | Format-List
+          "Build verified: x64 PE executable and release ZIP present" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InsaniquariumEnhanced-M1-Win64
+          path: release/InsaniquariumEnhanced-M1-Win64.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      - name: Publish M1 pre-release after successful build
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $notes = @'
+          M1 updated WinFish-source Windows x64 preview, compiled from the
+          WinFish decompilation through SaMeiers' SDL3/PopLib Windows port.
+
+          - Native x64 PE build verified in GitHub Actions.
+          - Requires assets from a purchased Insaniquarium Deluxe installation.
+          - The game has NOT been runtime-tested; this is a pre-release for testing.
+          - Latest WinFish bug fixes; no native 4K rendering, 60 FPS interpolation, or old proxy-DLL patching yet.
+
+          Credits and source revisions: see the repository README and the bundled README.txt.
+          '@
+          $asset = Join-Path 'release' $env:RELEASE_ASSET
+          gh release view $env:RELEASE_TAG --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG $asset --clobber --repo $env:GITHUB_REPOSITORY
+            if ($LASTEXITCODE -ne 0) { throw 'Could not update release asset' }
+          } else {
+            gh release create $env:RELEASE_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M1 preview (Windows x64)' --notes $notes --prerelease
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create GitHub pre-release' }
+          }
