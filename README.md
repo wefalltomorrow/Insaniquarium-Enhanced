@@ -134,6 +134,20 @@ analysis of the CSVs; it cannot directly measure monitor/GPU presentation
 or certify every audio/visual effect. The analyzer has synthetic CI fixtures
 for clean runs, missing logs, invalid sprite calls and moving paused objects.
 
+### M2 pets and effects diagnostic coverage
+
+The experimental **M2 Effects Audit** adds read-only simulation-update,
+sprite-draw and draw-state mutation probes for `OtherTypePet`, `Missle`
+(the original source spelling) and `Shot` effects. Aliens already have
+a probe; fish-type pets inherit the fish drawing path. Additional counters
+appear at the end of `M2DebugFrames.csv`, preserving the older column order.
+
+The one-click report identifies the exact frame, tick and render duration
+for any `presented=0` entry. It also distinguishes object types that were
+**not observed** during a recording from object types that were verified.
+These are game-side metrics and do not establish independent GPU/monitor
+presentation or complete smoothness of all remaining visual effects.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
