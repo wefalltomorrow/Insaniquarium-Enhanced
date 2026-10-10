@@ -98,6 +98,29 @@ def main() -> None:
                f'\n\tM2Debug::DrawGuard m2DrawGuard(M2Debug::{kind}, this, mXD, mYD, {cel});',
                f"record {classname} position, animation cel, and draw mutation")
 
+    # Read-only probes for un-interpolated pets, missiles and shot effects.
+    # FishTypePet inherits Fish::Draw and is already covered by fish drawing.
+    for name, kind, x, y, cel, integer in (
+        ("OtherTypePet", "OtherPet", "mXD", "mYD", "mAnimationIndex", False),
+        ("Missle", "Missile", "mXD", "mYD", "m0x178", False),
+        ("Shot", "ShotEffect", "mX", "mY", "m0x158", True),
+    ):
+        p = GAME / (name + ".cpp")
+        change(p, '#include "' + name + '.h"',
+               '#include "' + name + '.h"\n#include "M2DebugTrace.hpp"',
+               "include extra debug probe in " + name)
+        update = "void PopLib::" + name + "::Update()\n{"
+        change(p, update, update +
+               "\n\tM2Debug::Get().Updated(M2Debug::" + kind + ");",
+               "count " + name + " simulation updates")
+        draw = "void PopLib::" + name + "::Draw(Graphics* g)\n{"
+        guard = "IntDrawGuard" if integer else "DrawGuard"
+        change(p, draw, draw +
+               "\n\tM2Debug::" + guard +
+               " m2Probe(M2Debug::" + kind + ", this, " +
+               x + ", " + y + ", " + cel + ");",
+               "observe " + name + " rendering without changing gameplay")
+
     fish = GAME / "Fish.cpp"
     change(fish,
            '    g->Translate(m2DX, m2DY);\n    DrawFish(g, shouldFlip);',
