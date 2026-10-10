@@ -141,3 +141,56 @@ def audit_object_movement(folder: Path):
             findings.append("INFO: {} was drawn, but no simulated movement was "
                             "observed; moving-pet interpolation is not yet verified.".format(kind))
     return lines, findings
+
+
+def audit_fish_interpolation(folder: Path):
+    """Match fish / fish-type-pet object IDs to their visual render offsets.
+
+    Fish::Draw records both categories in M2DebugInterpolation.csv, so raw
+    interpolation rows lack an explicit kind column. Object IDs are used only
+    within one captured session; this is diagnostic, not gameplay logic.
+    """
+    objects = folder / "M2DebugObjects.csv"
+    interpolation = folder / "M2DebugInterpolation.csv"
+    if not objects.is_file() or not interpolation.is_file():
+        return [], []
+    ids = {"fish": set(), "fish_pet": set()}
+    try:
+        with objects.open("r", encoding="utf-8-sig", newline="") as file:
+            for row in csv.DictReader(file):
+                kind = row.get("kind")
+                if kind in ids and row.get("objectId") and len(ids[kind]) < 20000:
+                    ids[kind].add(row["objectId"])
+        overlap = ids["fish"].intersection(ids["fish_pet"])
+        totals = collections.Counter()
+        shifted = collections.Counter()
+        with interpolation.open("r", encoding="utf-8-sig", newline="") as file:
+            for row in csv.DictReader(file):
+                object_id = row.get("objectId")
+                if not object_id or object_id in overlap:
+                    continue
+                for kind in ids:
+                    if object_id in ids[kind]:
+                        totals[kind] += 1
+                        try:
+                            if float(row["offsetX"]) or float(row["offsetY"]):
+                                shifted[kind] += 1
+                        except (KeyError, TypeError, ValueError):
+                            pass
+                        break
+    except (OSError, csv.Error) as exc:
+        return [], ["WARN: Cannot audit fish-type pet interpolation: {}.".format(exc)]
+    lines = []
+    notes = []
+    for kind in ("fish", "fish_pet"):
+        if totals[kind]:
+            lines.append("{}: {:,} traced draws, {:,} nonzero offsets ({:.1f}%)".format(
+                kind, totals[kind], shifted[kind],
+                100.0 * shifted[kind] / totals[kind]))
+            if kind == "fish_pet" and shifted[kind] == 0:
+                notes.append("WARN: Fish-type pets were drawn but none received an interpolation "
+                             "offset; verify FishTypePet::Update visual history.")
+    if overlap:
+        notes.append("INFO: {} fish/fish-pet object IDs overlap; excluded from interpolation "
+                     "coverage to avoid misclassification.".format(len(overlap)))
+    return lines, notes
