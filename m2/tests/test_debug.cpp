@@ -49,6 +49,7 @@ int main() {
     diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack1");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.Updated(M2Debug::OtherPet);
+    diag.Updated(M2Debug::FishPet);
     diag.Updated(M2Debug::Missile);
     diag.Updated(M2Debug::ShotEffect);
     int shotX = 20, shotY = 30, shotAnim = 2;
@@ -57,6 +58,7 @@ int main() {
         Verify(shotX == 20 && shotY == 30, "shot instrumentation must not move object");
     }
     diag.Drawn(M2Debug::OtherPet, &id, 12, 20, 1);
+    diag.Drawn(M2Debug::FishPet, &id, 15, 22, 2);
     diag.Drawn(M2Debug::Missile, &id, 12, 20, 3);
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.ObjectMotion(M2Debug::Coin, &id, 120, 50, -1, 0, 0.3, false, true);
@@ -81,6 +83,8 @@ int main() {
     Verify(std::strstr(frameHeader, "updatesOtherPet") != nullptr &&
            std::strstr(frameHeader, "drawsMissile") != nullptr &&
            std::strstr(frameHeader, "drawsShotEffect") != nullptr,
+           std::strstr(frameHeader, "updatesFishPet") != nullptr &&
+           std::strstr(frameHeader, "drawsFishPet") != nullptr,
            "additional object counts exist in frame CSV");
     std::rewind(csv); // Include the header in the existing line-count assertion.
     int lines = 0, c = 0;
