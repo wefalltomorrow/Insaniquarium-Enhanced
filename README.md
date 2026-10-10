@@ -63,6 +63,23 @@ The opt-in debug launcher writes `M2Timing.log`, `M2DebugFrames.csv`, `M2DebugEv
 
 The October 10 recording showed ~35.7 gameplay Hz and ~60 presentation FPS, along with a fish acquiring an extreme simulation X coordinate on its first update. The experimental branch has two additional **unreleased until Windows CI succeeds** source changes: a render-only guard against unsafe coordinate conversion and a fix that initialises newly spawned fish's positive horizontal velocity. Neither has been validated in user gameplay yet.
 
+## Faster Windows M2 builds
+
+The experimental M2 GitHub Actions workflow uses **MSVC + Ninja + sccache**
+to reuse unchanged compiled C/C++ files. The October 10 Boundary Audit build
+reported 693 compiler cache hits and 9 misses (98.72% hit rate), reducing
+the complete workflow from around 16 minutes to under 5 minutes.
+
+A second, separate **immutable source cache** is being validated. It stores
+the exact pinned native port, WinFish, PopLib and required Git submodules
+before any generated or modified sources are written. On cache hits the job
+skips repeating the network clones, while validating pinned revision SHAs.
+The first run creates that source cache; compare later successful runs to
+measure whether restoring it is faster than downloading sources.
+
+Neither cache includes original PopCap game assets. Normal source and
+gameplay behaviour is unchanged, and existing PE x64/release checks remain.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
