@@ -58,7 +58,7 @@ def analyze(folder: Path):
         duration = number(row.get("renderMs"))
         longest_render = max(longest_render, duration)
         slow_render += duration > 25.0
-        for kind in ("Fish", "Coin", "Food", "Alien", "OtherPet", "Missile", "ShotEffect"):
+        for kind in ("Fish", "Coin", "Food", "Alien", "OtherPet", "FishPet", "Missile", "ShotEffect"):
             field = "draws" + kind
             if row.get(field) is not None:
                 traced_types.add(kind)
@@ -79,14 +79,16 @@ def analyze(folder: Path):
         frame_warn, slow_render, longest_render))
     report.append("Object draw totals: " + ", ".join(
         "{} {:,}".format(k.lower(), frame_types[k])
-        for k in ("Fish", "Coin", "Food", "Alien", "OtherPet", "Missile", "ShotEffect")
+        for k in ("Fish", "Coin", "Food", "Alien", "OtherPet", "FishPet", "Missile", "ShotEffect")
         if k in traced_types))
 
-    for kind in ("Alien", "OtherPet", "Missile", "ShotEffect"):
+    for kind in ("Alien", "OtherPet", "FishPet", "Missile", "ShotEffect"):
         if kind in traced_types and not frame_types[kind]:
             notes.append("INFO: {} was not drawn during this recording; movement is untested.".format(kind))
     if "OtherPet" not in traced_types:
         notes.append("INFO: extra pet/missile/shot probes not present in this build's frame CSV.")
+    if "FishPet" not in traced_types:
+        notes.append("INFO: separate fish-type pet counts not present in this build\'s frame CSV.")
     values = {"simulation": [], "presentation": []}
     timing = folder / "M2Timing.log"
     if timing.is_file():
