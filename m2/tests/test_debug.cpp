@@ -48,6 +48,16 @@ int main() {
     diag.SpriteCel(&id, 1, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack2");
     diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack1");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
+    diag.Updated(M2Debug::OtherPet);
+    diag.Updated(M2Debug::Missile);
+    diag.Updated(M2Debug::ShotEffect);
+    int shotX = 20, shotY = 30, shotAnim = 2;
+    {
+        M2Debug::IntDrawGuard shot(M2Debug::ShotEffect, &id, shotX, shotY, shotAnim);
+        Verify(shotX == 20 && shotY == 30, "shot instrumentation must not move object");
+    }
+    diag.Drawn(M2Debug::OtherPet, &id, 12, 20, 1);
+    diag.Drawn(M2Debug::Missile, &id, 12, 20, 3);
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.ObjectMotion(M2Debug::Coin, &id, 120, 50, -1, 0, 0.3, false, true);
     diag.ObjectMotion(M2Debug::Food, &id, 123, 44, 0, -1, 0.5, false, true);
@@ -64,6 +74,13 @@ int main() {
     std::fflush(nullptr); // flush recorder streams before inspecting files
     FILE* csv = std::fopen("M2DebugFrames.csv", "rb");
     Verify(csv != nullptr, "frames output exists");
+    char frameHeader[1024] = {};
+    Verify(std::fgets(frameHeader, sizeof(frameHeader), csv) != nullptr,
+           "frame CSV header exists");
+    Verify(std::strstr(frameHeader, "updatesOtherPet") != nullptr &&
+           std::strstr(frameHeader, "drawsMissile") != nullptr &&
+           std::strstr(frameHeader, "drawsShotEffect") != nullptr,
+           "additional object counts exist in frame CSV");
     int lines = 0, c = 0;
     while ((c = std::fgetc(csv)) != EOF) if (c == '\n') ++lines;
     std::fclose(csv);
