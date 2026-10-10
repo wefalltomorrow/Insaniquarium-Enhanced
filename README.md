@@ -148,6 +148,19 @@ for any `presented=0` entry. It also distinguishes object types that were
 These are game-side metrics and do not establish independent GPU/monitor
 presentation or complete smoothness of all remaining visual effects.
 
+### M2 alien interpolation (experimental)
+
+Following the Effects Audit raw logs (8,409 presented frames, 5,006
+original simulation ticks), two alien encounters were traced over 564
+draw records. The largest adjacent single-tick alien position changes
+were 6.28px horizontally and 3.28px vertically. No alien position or
+animation-cell changes were observed between ticks. The M2 experiment
+adds **render-only** alien sprite translation using the same pause-safe,
+48px teleport-protected interpolation helper as other game objects.
+AI, target selection, hitboxes, collisions and save data stay on the
+original 28ms tick. Alien offsets are logged to M2DebugObjectMotion.csv.
+Other pets, missiles and shot effects are not interpolated by this change.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
