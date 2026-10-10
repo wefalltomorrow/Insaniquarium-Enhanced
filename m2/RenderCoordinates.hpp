@@ -17,16 +17,20 @@ inline bool RenderablePosition(double x, double y) {
 inline bool SafeFishRenderOffset(double previousX, double previousY,
                                  double currentX, double currentY,
                                  int gameX, int gameY, double blend,
-                                 int& offsetX, int& offsetY) {
+                                 int& offsetX, int& offsetY,
+                                 double maxMovePerTick = 48.0) {
     offsetX = offsetY = 0;
     if (!RenderablePosition(previousX, previousY) ||
         !RenderablePosition(currentX, currentY) ||
-        !std::isfinite(blend) || blend < 0.0 || blend > 1.0)
+        !std::isfinite(blend) || blend < 0.0 || blend > 1.0 ||
+        !std::isfinite(maxMovePerTick) || maxMovePerTick <= 0.0 ||
+        maxMovePerTick > 96.0)
         return false;
 
-    // Preserve the previous teleport/spawn rejection semantics.
-    if (std::abs(currentX - previousX) >= 48.0 ||
-        std::abs(currentY - previousY) >= 48.0)
+    // Fish and uncollected objects retain the 48px teleport guard.
+    // Rapid collected-coin homing may opt into a bounded 96px guard.
+    if (std::abs(currentX - previousX) >= maxMovePerTick ||
+        std::abs(currentY - previousY) >= maxMovePerTick)
         return false;
 
     const double renderX = previousX + (currentX - previousX) * blend;
