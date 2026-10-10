@@ -17,6 +17,8 @@ def replace_one(source: str, original: str, replacement: str, name: str) -> str:
     return source.replace(original, replacement, 1)
 
 def patch_header(source: str) -> str:
+    if "mM2HavePrev = false;" in source or "mM2PrevXD = " in source:
+        raise RuntimeError("other-pet visual history is already patched")
     return replace_one(
         source,
         "\tclass OtherTypePet : public GameObject\n\t{\n\tpublic:",
