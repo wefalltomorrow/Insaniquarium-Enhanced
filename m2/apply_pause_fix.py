@@ -36,18 +36,18 @@ def main() -> None:
 
     patch(fish,
           '''    int m2DX = 0, m2DY = 0;
-    if (gEnhancedM2Enabled && mM2HavePrev &&
-        std::abs(mXD - mM2PrevXD) < 48.0 &&''',
+    if (gEnhancedM2Enabled && mM2HavePrev) {
+        // Reject non-finite, extreme or teleporting positions before any''',
           '''    int m2DX = 0, m2DY = 0;
-    // The application loop continues updating the Options UI while the
-    // gameplay board is paused. Without a guard the interpolation alpha
-    // keeps cycling between two old fish positions, making fish jitter.
+    // The UI can continue redrawing while the gameplay board is paused.
+    // Discard stale render history instead of blending old fish positions.
+    // SafeFishRenderOffset still guards the integer conversion after resume.
     const bool m2GameplayPaused = mApp->mBoard && mApp->mBoard->mPause;
     EnhancedM2::InvalidateHistoryOnPause(
         gEnhancedM2Enabled, m2GameplayPaused, mM2HavePrev);
     if (EnhancedM2::CanInterpolate(
-            gEnhancedM2Enabled, m2GameplayPaused, mM2HavePrev) &&
-        std::abs(mXD - mM2PrevXD) < 48.0 &&''',
+            gEnhancedM2Enabled, m2GameplayPaused, mM2HavePrev)) {
+        // Reject non-finite, extreme or teleporting positions before any''',
           "freeze fish rendering on paused simulation positions")
 
     # The moment a modal is opened/closed is useful for correlating frame
