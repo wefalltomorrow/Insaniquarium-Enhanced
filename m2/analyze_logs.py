@@ -32,6 +32,8 @@ def analyze(folder: Path):
     first_frame = last_frame = -1
     last_tick = 0
     present_ok = 0
+    non_presented = []
+    traced_types = set()
     frame_invalid = frame_warn = 0
     slow_render = 0
     longest_render = 0.0
@@ -44,14 +46,22 @@ def analyze(folder: Path):
             first_frame = frame
         last_frame = frame
         last_tick = int(number(row.get("totalSimTicks")))
-        present_ok += int(number(row.get("presented")))
+        presented = int(number(row.get("presented")))
+        present_ok += presented
+        if not presented and len(non_presented) < 12:
+            non_presented.append("frame {} (tick {}, render {:.3f}ms, elapsed {:.3f}ms)".format(
+                frame, int(number(row.get("totalSimTicks"))),
+                number(row.get("renderMs")), number(row.get("elapsedMs"))))
         frame_invalid += int(number(row.get("invalidCels")))
         frame_warn += int(number(row.get("warnings")))
         duration = number(row.get("renderMs"))
         longest_render = max(longest_render, duration)
         slow_render += duration > 25.0
-        for kind in ("Fish", "Coin", "Food", "Alien"):
-            frame_types[kind] += int(number(row.get("draws" + kind)))
+        for kind in ("Fish", "Coin", "Food", "Alien", "OtherPet", "Missile", "ShotEffect"):
+            field = "draws" + kind
+            if row.get(field) is not None:
+                traced_types.add(kind)
+                frame_types[kind] += int(number(row[field]))
     report.append("Insaniquarium Enhanced M2 - recorded diagnostics")
     report.append("Input folder: " + str(folder.resolve()))
     report.append("Recorded frame rows: {:,}; last frame: {}; total sim ticks: {:,}".format(
@@ -60,13 +70,22 @@ def analyze(folder: Path):
         notes.append("ERROR: M2DebugFrames.csv missing or contains no frame data.")
     if frame_total and present_ok != frame_total:
         notes.append("WARN: {:,} logged frames have presented=0.".format(frame_total - present_ok))
+        report.append("Non-presented frame samples (up to 12): " + "; ".join(non_presented))
+        notes.append("INFO: presented=0 is a game-side draw result, not proof of a monitor drop.")
     if frame_invalid:
         notes.append("ERROR: {:,} invalid sprite draws counted in frame summaries.".format(frame_invalid))
     report.append("Frame warnings: {:,}; render over 25ms: {:,}; worst render: {:.3f}ms".format(
         frame_warn, slow_render, longest_render))
     report.append("Object draw totals: " + ", ".join(
-        "{} {:,}".format(k.lower(), v) for k, v in frame_types.items()))
+        "{} {:,}".format(k.lower(), frame_types[k])
+        for k in ("Fish", "Coin", "Food", "Alien", "OtherPet", "Missile", "ShotEffect")
+        if k in traced_types))
 
+    for kind in ("Alien", "OtherPet", "Missile", "ShotEffect"):
+        if kind in traced_types and not frame_types[kind]:
+            notes.append("INFO: {} was not drawn during this recording; movement is untested.".format(kind))
+    if "OtherPet" not in traced_types:
+        notes.append("INFO: extra pet/missile/shot probes not present in this build's frame CSV.")
     values = {"simulation": [], "presentation": []}
     timing = folder / "M2Timing.log"
     if timing.is_file():
