@@ -196,10 +196,10 @@ public:
         }
     }
 
-    // Object motion stays separate from the fish-only interpolation trace.
+    // Coin/food/alien motion stays separate from fish-only interpolation.
     void ObjectMotion(Kind kind, const void* object, double x, double y,
                       int dx, int dy, double blend, bool paused, bool history) {
-        if (!active || (kind != Coin && kind != Food) || !motion ||
+        if (!active || (kind != Coin && kind != Food && kind != Alien) || !motion ||
             !SampleDetailFrame(frame) || motionRows >= kTraceRowLimit ||
             perFrameMotion >= kObjectsPerFrame) return;
         ++perFrameMotion;
