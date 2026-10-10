@@ -74,7 +74,11 @@ def main() -> None:
             "\t\tg, gEnhancedM2Enabled,\n"
             "\t\tmApp->mBoard && mApp->mBoard->mPause,\n"
             "\t\tmM2HavePrev, mM2PrevXD, mM2PrevYD,\n"
-            "\t\tmXD, mYD, mX, mY, gEnhancedM2Blend);"
+            "\t\tmXD, mYD, mX, mY, gEnhancedM2Blend);\n"
+            "\tM2Debug::Get().ObjectMotion(M2Debug::" + obj + ", this,\n"
+            "\t\tmXD, mYD, m2VisualShift.ShiftX(), m2VisualShift.ShiftY(),\n"
+            "\t\tgEnhancedM2Blend, mApp->mBoard && mApp->mBoard->mPause,\n"
+            "\t\tmM2HavePrev);"
         )
         change(source, draw_music + next_line, scope + next_line,
                f"translate {obj} sprite with automatic early-return restoration")
