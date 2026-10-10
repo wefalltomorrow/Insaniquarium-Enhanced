@@ -87,6 +87,33 @@ int main() {
         Verify(alienPaused.ShiftX() == 0 && !prev,
                "pausing clears alien visual history without moving the sprite");
     }
+    prev = true;
+    {
+        // Other-type pets from the prior gameplay trace took sub-2px steps.
+        // An uninterrupted graphics shift must not change any hitbox coords.
+        ScopedObjectTranslation<GraphicsProbe> otherPet(
+            &g, true, false, prev, 140.0, 300.0,
+            141.0, 302.0, 141, 302, .25);
+        Verify(otherPet.ShiftY() == -2,
+               "other-pet render-only interpolation of small movements");
+        Verify(g.y == -2, "other-pet translation applied only to Graphics");
+    }
+    Verify(g.x == 0 && g.y == 0, "other-pet translation restored");
+    {
+        ScopedObjectTranslation<GraphicsProbe> petPaused(
+            &g, true, true, prev, 140.0, 300.0,
+            141.0, 302.0, 141, 302, .25);
+        Verify(petPaused.ShiftX() == 0 && petPaused.ShiftY() == 0 && !prev,
+               "other-pet pause invalidates visual history");
+    }
+    prev = true;
+    {
+        ScopedObjectTranslation<GraphicsProbe> petTeleport(
+            &g, true, false, prev, 140.0, 300.0,
+            240.0, 302.0, 240, 302, .5);
+        Verify(petTeleport.ShiftX() == 0 && petTeleport.ShiftY() == 0,
+               "other-pet teleport guard remains active");
+    }
     Verify(g.x == 0 && g.y == 0, "all visual translation operations balanced");
     std::puts("PASS M2 coin/food visual interpolation scope and pause guards");
 }
