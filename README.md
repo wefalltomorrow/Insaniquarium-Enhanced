@@ -70,12 +70,17 @@ to reuse unchanged compiled C/C++ files. The October 10 Boundary Audit build
 reported 693 compiler cache hits and 9 misses (98.72% hit rate), reducing
 the complete workflow from around 16 minutes to under 5 minutes.
 
-A second, separate **immutable source cache** is being validated. It stores
-the exact pinned native port, WinFish, PopLib and required Git submodules
-before any generated or modified sources are written. On cache hits the job
-skips repeating the network clones, while validating pinned revision SHAs.
-The first run creates that source cache; compare later successful runs to
-measure whether restoring it is faster than downloading sources.
+A second, separate **immutable source cache** stores the exact pinned
+native port, WinFish, PopLib and required Git submodules before any generated
+or modified sources are written. On hits, it skips network clones and verifies
+the pinned revision SHAs. The [verified warm-cache run](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/actions/runs/38025453987)
+completed in **4m 11s**, with 700 compiler cache hits, 2 misses (99.72%),
+and a successful experimental Windows x64 release. This is a repeatable
+measurement, not a promise of identical timing on every GitHub runner.
+
+The next experimental build investigates turning off unnecessary C++20 module
+dependency scanning in CMake. Until its CI run passes, the warm-cache build
+above remains the known-good release.
 
 Neither cache includes original PopCap game assets. Normal source and
 gameplay behaviour is unchanged, and existing PE x64/release checks remain.
