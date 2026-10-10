@@ -81,6 +81,7 @@ int main() {
            std::strstr(frameHeader, "drawsMissile") != nullptr &&
            std::strstr(frameHeader, "drawsShotEffect") != nullptr,
            "additional object counts exist in frame CSV");
+    std::rewind(csv); // Include the header in the existing line-count assertion.
     int lines = 0, c = 0;
     while ((c = std::fgetc(csv)) != EOF) if (c == '\n') ++lines;
     std::fclose(csv);
