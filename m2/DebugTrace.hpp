@@ -37,7 +37,9 @@ class Recorder {
     FILE* skippedSprites = nullptr;
     FILE* events = nullptr;
     unsigned long long frame = 0, ticks = 0;
-    unsigned long long totalEvents = 0, totalTrace = 0;
+    unsigned long long totalEvents = 0;
+    // Separate file budgets: object-heavy scenes must not exhaust the other CSVs.
+    unsigned long long objectRows = 0, spriteRows = 0, interpRows = 0;
     unsigned long long lastReportedTick = 0, invalidRows = 0, skippedRows = 0;
     unsigned update[Kinds] = {}, draw[Kinds] = {};
     unsigned spriteCount = 0, invalidSpriteCount = 0, skippedSpriteCount = 0, celChanges = 0;
@@ -146,13 +148,13 @@ public:
         if (repeated && moved)
             LogEvent("WARN", "simulation_position_changed_without_game_tick",
                      static_cast<double>(kind), static_cast<double>(since));
-        if (objects && totalTrace < kTraceRowLimit &&
+        if (objects && objectRows < kTraceRowLimit &&
             perFrameObjects++ < kObjectsPerFrame) {
             std::fprintf(objects, "%llu,%llu,%s,%llu,%.4f,%.4f,%d,%u,%u,%u,%llu\n",
                          frame, ticks, Name(kind),
                          static_cast<unsigned long long>(key.second),
                          x, y, cel, changedCel, moved, repeated, since);
-            ++totalTrace;
+            ++objectRows;
         }
         previous = {x, y, cel, ticks, frame, true};
     }
@@ -170,16 +172,16 @@ public:
 
     void RenderOffset(const void* object, double simX, double simY,
                       double dx, double dy, double blend) {
-        if (!active || !events || totalEvents >= 20000) return;
+        if (!active) return;
         if (!std::isfinite(dx) || !std::isfinite(dy))
             LogEvent("ERROR", "nonfinite_fish_render_offset", dx, dy);
         if (std::abs(dx) > 50.0 || std::abs(dy) > 50.0)
             LogEvent("WARN", "large_fish_interpolation_offset", dx, dy);
-        if (interp && totalTrace < kTraceRowLimit && perFrameObjects < kObjectsPerFrame) {
+        if (interp && interpRows < kTraceRowLimit && perFrameObjects < kObjectsPerFrame) {
             std::fprintf(interp, "%llu,%llu,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.5f\n",
                          frame, ticks, static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(object)),
                          simX, simY, simX + dx, simY + dy, dx, dy, blend);
-            ++totalTrace;
+            ++interpRows;
         }
     }
 
@@ -209,7 +211,17 @@ public:
                 assetPath == "images/lasers" &&
                 maxCols == 10 && maxRows == 6 &&
                 col >= 10 && col <= 13 && row >= 0 && row < 6;
-            const bool expectedSkip = hiddenFirstCel || hiddenLaserTail;
+            // Single-index DrawImageCel maps the terminal index 17/17 or
+            // 10/10 to (col=0,row=1); old Graphics rejects it without draw.
+            // Warp::Draw and HatchScreen are the confirmed callers. Match
+            // exact image paths and sheet shape; leave other errors visible.
+            const bool hiddenWarpFinal = col == 0 && row == 1 &&
+                maxCols == 17 && maxRows == 1 &&
+                (assetPath == "images/warphole" || assetPath == "images/warpglow");
+            const bool hiddenEggFinal = col == 0 && row == 1 &&
+                maxCols == 10 && maxRows == 1 && assetPath == "images/eggcrack2";
+            const bool expectedSkip = hiddenFirstCel || hiddenLaserTail ||
+                                      hiddenWarpFinal || hiddenEggFinal;
             if (expectedSkip)
                 ++skippedSpriteCount;
             else {
@@ -233,13 +245,13 @@ public:
                 ++count;
             }
         }
-        if (sprites && totalTrace < kTraceRowLimit &&
+        if (sprites && spriteRows < kTraceRowLimit &&
             perFrameSprites++ < kSpritesPerFrame && (frame % 2) == 0) {
             std::fprintf(sprites, "%llu,%llu,%llu,%d,%d,%d,%d\n",
                          frame, ticks,
                          static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(image)),
                          col, row, x, y);
-            ++totalTrace;
+            ++spriteRows;
         }
     }
     void DrawMutation(Kind kind, const void* object, double beforeX, double beforeY,

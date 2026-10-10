@@ -32,7 +32,13 @@ int main() {
     diag.SpriteCel(&id, 11, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
     diag.SpriteCel(&id, 13, 5, 0, 0, 10, 6, 800, 480, "images/lasers");
     diag.SpriteCel(&id, 14, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
-    diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1000, 100, "images/eggcrack2");
+    diag.SpriteCel(&id, 0, 1, 20, 0, 17, 1, 1020, 220, "images/warphole");
+    diag.SpriteCel(&id, 0, 1, 0, 0, 17, 1, 1700, 220, "images/warpglow");
+    diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack2");
+    diag.SpriteCel(&id, 0, 2, 0, 0, 17, 1, 1020, 220, "images/warphole");
+    diag.SpriteCel(&id, 0, 1, 0, 0, 16, 1, 1020, 220, "images/warphole");
+    diag.SpriteCel(&id, 1, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack2");
+    diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack1");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
@@ -68,13 +74,17 @@ int main() {
     Verify(std::strstr(record, "images/test_sheet.png") != nullptr, "asset path appears in invalid sprite trace");
     Verify(std::strstr(record, ",-1,0,12,20") != nullptr, "invalid cel numbers appear in trace");
     int unexpectedRows = 1;
+    bool rejectedWarp = false, rejectedEgg = false;
     while (std::fgets(record, sizeof(record), invalid) != nullptr) {
+        if (std::strstr(record, "images/warphole")) rejectedWarp = true;
+        if (std::strstr(record, "images/eggcrack")) rejectedEgg = true;
         Verify(std::strstr(record, "merylblink") == nullptr &&
                std::strstr(record, "chomp") == nullptr,
                "known hidden frames must not count as invalid");
         ++unexpectedRows;
     }
-    Verify(unexpectedRows == 4, "unclassified negative, high, laser-14 and egg row cells all logged");
+    Verify(unexpectedRows == 7, "seven invalid cells remain, including boundary near misses");
+    Verify(rejectedWarp && rejectedEgg, "unknown warp and egg requests remain invalid");
     std::fclose(invalid);
 
     FILE* skipped = std::fopen("M2DebugSkippedSprites.csv", "rb");
@@ -101,8 +111,17 @@ int main() {
            std::strstr(record, "images/lasers") != nullptr &&
            std::strstr(record, ",13,5,") != nullptr,
            "Laser tail at highest real row logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/warphole") != nullptr &&
+           std::strstr(record, ",0,1,") != nullptr, "exact warphole tail");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/warpglow") != nullptr &&
+           std::strstr(record, ",0,1,") != nullptr, "exact warpglow tail");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/eggcrack2") != nullptr &&
+           std::strstr(record, ",0,1,") != nullptr, "exact egg crack tail");
     Verify(std::fgets(record, sizeof(record), skipped) == nullptr,
-           "only the known nonrendering frames are classified");
+           "only known nonrendering frames are classified");
     std::fclose(skipped);
 
     std::puts("PASS M2 debug timing, classified hidden frames and invalid sprite traces");
