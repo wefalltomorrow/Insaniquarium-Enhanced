@@ -27,6 +27,24 @@ M1.1 restores the full **Hardware Acceleration** text in the Options menu and re
 
 **No original PopCap game assets are distributed by this project.** Existing save data should be backed up before testing pre-releases.
 
+## M2 boundary diagnostics (experimental)
+
+The October 10 Sprite Audit logs showed 18 nonrendered warp frames
+(`images/warphole` / `images/warpglow`), and two nonrendered
+`images/eggcrack2` terminal frames. The pinned WinFish source requests
+frame 17 on 17-frame warp strips and frame 10 on a 10-frame egg strip;
+the original renderer ignores those requests.
+
+The [boundary-audit source patch](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/commit/5213766a9bbb08f52837d97b8fe6cd910a6b9309)
+classifies **only** those exact frame/asset combinations as expected skips
+and keeps malformed or different out-of-range requests as warnings. It does
+not clamp animation frames or change how sprites render.
+
+This patch also gives the objects, sprites and interpolation CSV logs separate
+350,000-row budgets, improving coverage during longer M2 test sessions.
+GitHub Actions validates the changes before publishing an experimental
+Windows x64 release.
+
 ## Experimental M2 — independent 60 FPS presentation
 
 [M2 is being tested in draft PR #5](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/pull/5), **not merged into `main`**. M1.2 remains the baseline build. The most recently **completed and published** M2 test is [Sprite Sentinels](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/m2-sprite-sentinels-20261010). Newer M2 Fish Initialization and Render Guard changes are undergoing Windows compilation; do not treat a queued or running Actions job as a downloadable release.
