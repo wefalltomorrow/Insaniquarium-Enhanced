@@ -17,13 +17,15 @@ public:
                             bool paused, bool& haveHistory,
                             double previousX, double previousY,
                             double currentX, double currentY,
-                            int gameX, int gameY, double blend)
+                            int gameX, int gameY, double blend,
+                            double maxMovePerTick = 48.0)
         : graphics_(graphics) {
         InvalidateHistoryOnPause(enabled, paused, haveHistory);
         if (!graphics_ || !CanInterpolate(enabled, paused, haveHistory))
             return;
         if (SafeFishRenderOffset(previousX, previousY, currentX, currentY,
-                                 gameX, gameY, blend, dx_, dy_) &&
+                                 gameX, gameY, blend, dx_, dy_,
+                                 maxMovePerTick) &&
             (dx_ != 0 || dy_ != 0))
             graphics_->Translate(dx_, dy_);
     }
