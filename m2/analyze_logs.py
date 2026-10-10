@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 import re
 import statistics
-from trace_integrity import audit_traces, audit_object_movement
+from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation
 
 def rows(folder: Path, filename: str):
     path = folder / filename
@@ -186,6 +186,12 @@ def analyze(folder: Path):
         report.append("Other-object simulation motion (NOT 60 FPS animation proof):")
         report.extend("- " + entry for entry in movement)
     notes.extend(movement_notes)
+    fish_detail, fish_notes = audit_fish_interpolation(folder)
+    if fish_detail:
+        report.append("")
+        report.append("Fish vs fish-type pet interpolation (actual render offsets):")
+        report.extend("- " + entry for entry in fish_detail)
+    notes.extend(fish_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
     report.append("presentation, visual smoothness, audio fidelity and all gameplay modes")
     report.append("require separate observation/testing.")
