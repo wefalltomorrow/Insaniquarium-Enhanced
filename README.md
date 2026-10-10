@@ -161,6 +161,24 @@ AI, target selection, hitboxes, collisions and save data stay on the
 original 28ms tick. Alien offsets are logged to M2DebugObjectMotion.csv.
 Other pets, missiles and shot effects are not interpolated by this change.
 
+### M2 trace integrity and pet motion audit
+
+The optional `Analyze M2 Logs.cmd` now checks each CSV for malformed or
+unfinished rows, inconsistent end-frame numbers and the 350,000-row
+detail limit. Differences in the final recorded frame are flagged as
+**possible** partial/mixed captures—not automatically a gameplay failure,
+because some objects can legitimately stop producing trace rows.
+
+`M2DebugObjects.csv` is also summarised by object kind, including
+individual moving versus stationary pets, aliens, missiles and shot effects.
+Fish-type pets (which inherit `Fish::Draw`) now have distinct
+`fish_pet` drawing and simulation counters, while preserving original
+gameplay, AI and collision handling. A missing or stationary pet is not
+proof that every pet animation is smooth at 60 FPS.
+
+The trace analyzer still measures game-side diagnostics only; successful
+CSV checks do not establish physical monitor frame delivery.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
