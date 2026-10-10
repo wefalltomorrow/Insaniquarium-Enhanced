@@ -7,7 +7,7 @@ from unittest.mock import patch
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from trace_integrity import inspect_trace, audit_traces, audit_object_movement
+from trace_integrity import inspect_trace, audit_traces, audit_object_movement, audit_fish_interpolation
 from analyze_logs import analyze
 
 
@@ -67,6 +67,26 @@ class TraceIntegrityTests(unittest.TestCase):
         self.assertTrue(any("largest observed step X/Y 3.00/1.00px" in x for x in info))
         self.assertTrue(any("other_pet was drawn, but no simulated movement" in x for x in findings))
         self.assertFalse(any("fish_pet was drawn, but no simulated movement" in x for x in findings))
+
+    def test_detects_fish_pet_missing_visual_history(self):
+        cols = ["frame", "gameTick", "kind", "objectId", "simulationX",
+                "simulationY", "simMoved", "changedCel"]
+        self.write_csv("M2DebugObjects.csv", cols, [
+            [1, 1, "fish", 101, 10, 10, 0, 0],
+            [1, 1, "fish_pet", 202, 20, 20, 0, 0],
+            [2, 2, "fish_pet", 202, 22, 20, 1, 1]])
+        self.write_csv("M2DebugInterpolation.csv",
+                       ["frame", "objectId", "offsetX", "offsetY"],
+                       [[1, 101, 1, 0], [1, 202, 0, 0], [2, 202, 0, 0]])
+        lines, findings = audit_fish_interpolation(self.folder)
+        self.assertTrue(any("fish_pet: 2 traced draws, 0 nonzero offsets" in x for x in lines))
+        self.assertTrue(any("Fish-type pets were drawn but none" in x for x in findings))
+        self.write_csv("M2DebugInterpolation.csv",
+                       ["frame", "objectId", "offsetX", "offsetY"],
+                       [[1, 101, 1, 0], [1, 202, -1, 0], [2, 202, 0, 0]])
+        lines, findings = audit_fish_interpolation(self.folder)
+        self.assertTrue(any("fish_pet: 2 traced draws, 1 nonzero offsets (50.0%)" in x for x in lines))
+        self.assertFalse(any("Fish-type pets were drawn but none" in x for x in findings))
 
     def test_report_integration(self):
         self.write_csv("M2DebugFrames.csv",
