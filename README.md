@@ -109,6 +109,19 @@ and tests for pause, teleport and invalid-position safety.
 
 The M2 debug launcher also writes `M2DebugObjectMotion.csv` with coin/food simulation positions, render shifts, frame blend, pause status and visual-history state. It is independent of the fish-only `M2DebugInterpolation.csv` and uses the same long-session sampling policy.
 
+### Collected-coin animation smoothing (M2 experimental)
+
+On the October 10 Motion Diagnostics recording, collected coins moved
+more than 48 pixels in 21 consecutive simulation steps, up to 76.57px.
+The original coin-collection homing behavior was visible in the generated
+native port, but the 48px teleport guard prevented rendering interpolation
+on these early collection steps. M2 now uses a bounded 96px per-tick
+interpolation limit **only when the coin is in collected/homing state**.
+Fish, food and uncollected coins retain the previous 48px limit.
+Coin positions, collision/click handling, collection rate, audio and
+saved game state are unchanged. CI includes a 77px homing regression test,
+pause checks, and a >96px teleport rejection test.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
