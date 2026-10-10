@@ -6,11 +6,12 @@ A modern Windows x64 build of **Insaniquarium! Deluxe**, based on the community 
 
 | Release | Game source | Status |
 | --- | --- | --- |
-| [M1.2 in-game updater (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.2-m1-update) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Native compilation verified; update popup needs in-game testing |
-| [M1.1 menu update (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.1-m1-menu) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Compiled and packaged; menu changes need gameplay validation |\n| [M1 preview (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.0-m1-preview) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Native compilation verified; gameplay testing required |
+| [M1.2 in-game updater (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.2-m1-update) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Native compilation verified; in-game update popup tested by user |
+| [M1.1 menu update (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.1-m1-menu) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Compiled and packaged; menu changes tested by user |
+| [M1 preview (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.2.0-m1-preview) | WinFish [f919b3c](https://github.com/Vindirect/WinFish/commit/f919b3c241cfd611c547f1653fb3514f500f761b), October 8, 2026 | Native compilation verified; gameplay testing required |
 | [M0 (Windows x64)](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/v0.1.0-m0) | WinFish [61ddba1](https://github.com/Vindirect/WinFish/commit/61ddba10056621c7857ea6f822139c39c76a4019), March 13, 2026 | Original known-compatible port baseline |
 
-Both are **pre-releases**: Windows x64 compilation, binary architecture and ZIP packaging passed automated checks, but this does not establish that every game mode works at runtime.
+These builds are **pre-releases**: Windows x64 compilation, binary architecture and ZIP packaging passed automated checks, but this does not establish that every game mode works at runtime.
 
 ### What's different in M1?
 
@@ -25,6 +26,24 @@ M1.1 restores the full **Hardware Acceleration** text in the Options menu and re
 3. Launch `InsaniquariumEnhanced.exe`.
 
 **No original PopCap game assets are distributed by this project.** Existing save data should be backed up before testing pre-releases.
+
+## Experimental M2 — independent 60 FPS presentation
+
+[M2 is being tested in draft PR #5](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/pull/5), **not merged into `main`**. M1.2 remains the baseline build. The most recently **completed and published** M2 test is [Sprite Sentinels](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/m2-sprite-sentinels-20261010). Newer M2 Fish Initialization and Render Guard changes are undergoing Windows compilation; do not treat a queued or running Actions job as a downloadable release.
+
+The experimental M2 scheduler preserves **one gameplay update every 28 ms (~35.7 Hz)** while targeting **60 rendered frames per second**. Fish movement receives render-only positional interpolation. Other animations and moving object classes have *not* been fully interpolated, and the game still presents a **640×480 logical framebuffer** rather than native 4K. Native-resolution rendering and antialiasing remain future work.
+
+### Running the M2 test
+
+1. Extract the published M2 ZIP into a **separate folder** so the working M1.2 installation stays intact.
+2. Copy the original game folders `data`, `images`, `music`, `properties`, `sounds`, and `fishsongs` alongside the new executable.
+3. Run **`Start M2.cmd`** for 60 FPS presentation with normal diagnostic overhead.
+4. Run **`Start M2 Debug.cmd`** instead when collecting troubleshooting logs. Esc toggles the gameplay Options pause menu; it does not dismiss unrelated modal dialogs.
+5. To use the nonexperimental timing path, start `InsaniquariumEnhanced.exe` directly.
+
+The opt-in debug launcher writes `M2Timing.log`, `M2DebugFrames.csv`, `M2DebugEvents.csv`, `M2DebugObjects.csv`, `M2DebugSprites.csv`, `M2DebugInterpolation.csv`, `M2DebugInvalidSprites.csv` and `M2DebugSkippedSprites.csv`. The skipped-sprite file tracks known no-draw sentinel calls; it does not indicate corrupt animations. Report genuinely unexpected calls using the invalid-sprite file.
+
+The October 10 recording showed ~35.7 gameplay Hz and ~60 presentation FPS, along with a fish acquiring an extreme simulation X coordinate on its first update. The experimental branch has two additional **unreleased until Windows CI succeeds** source changes: a render-only guard against unsafe coordinate conversion and a fix that initialises newly spawned fish's positive horizontal velocity. Neither has been validated in user gameplay yet.
 
 ## Development
 
