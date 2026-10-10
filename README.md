@@ -122,6 +122,18 @@ Coin positions, collision/click handling, collection rate, audio and
 saved game state are unchanged. CI includes a 77px homing regression test,
 pause checks, and a >96px teleport rejection test.
 
+### Automatic M2 diagnostic report
+
+Experimental ZIPs now include **Analyze M2 Logs.cmd** and
+`AnalyzeM2Logs.py`. After a debug session, close the game and run
+the batch file from the extracted game folder (requires Windows Python 3).
+It writes `M2DiagnosticReport.txt` summarising recorded simulation/display
+rates, frame stalls, pause events, invalid sprite calls, fish/coin/food
+interpolation coverage and paused-frame motion errors. This is a read-only
+analysis of the CSVs; it cannot directly measure monitor/GPU presentation
+or certify every audio/visual effect. The analyzer has synthetic CI fixtures
+for clean runs, missing logs, invalid sprite calls and moving paused objects.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
