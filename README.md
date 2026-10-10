@@ -198,6 +198,27 @@ collisions, save data, pet simulation movement, ordinary fish or M1.2.
 for ordinary fish and fish-type pets by their respective object IDs,
 so an in-game recording can confirm or refute the effect.
 
+### Other-type pet interpolation (M2 experimental)
+
+The earlier **M2 Trace Audit** included four `other_pet` object IDs,
+295 simulation movements and observed maximum adjacent-tick changes
+around 0.67 px horizontally and 1.62 px vertically. The latest FishPet
+recording contained just one stationary other-type pet, so that
+recording alone was not sufficient to verify smoothing.
+
+The experimental `m2/apply_other_pet.py` now samples other-pet visual
+history in `OtherTypePet::Update` and uses scoped Graphics-only
+translation during `OtherTypePet::Draw`. The normal 48px per-tick
+teleport limit and pause-history invalidation apply. The
+`UpdateFishSongMgr` callback runs on the 28ms simulation update
+rather than repeated draw calls in M2 mode.
+
+Other-pet movement offsets are included in
+`M2DebugObjectMotion.csv`. **No other-pet smoothness claim** is made
+until gameplay logs show nonzero `other_pet` offsets while moving.
+The normal/non-M2 path, AI, hitboxes, collisions, clicks and saves
+are not changed. Missiles and shot-effect animation remain unmodified.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
