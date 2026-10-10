@@ -33,18 +33,19 @@ class Recorder {
     FILE* objects = nullptr;
     FILE* sprites = nullptr;
     FILE* interp = nullptr;
+    FILE* motion = nullptr;
     FILE* invalidSprites = nullptr;
     FILE* skippedSprites = nullptr;
     FILE* events = nullptr;
     unsigned long long frame = 0, ticks = 0;
     unsigned long long totalEvents = 0;
     // Separate file budgets: object-heavy scenes must not exhaust the other CSVs.
-    unsigned long long objectRows = 0, spriteRows = 0, interpRows = 0;
+    unsigned long long objectRows = 0, spriteRows = 0, interpRows = 0, motionRows = 0;
     unsigned long long lastReportedTick = 0, invalidRows = 0, skippedRows = 0;
     unsigned update[Kinds] = {}, draw[Kinds] = {};
     unsigned spriteCount = 0, invalidSpriteCount = 0, skippedSpriteCount = 0, celChanges = 0;
     unsigned currentWarnings = 0;
-    unsigned perFrameObjects = 0, perFrameSprites = 0;
+    unsigned perFrameObjects = 0, perFrameSprites = 0, perFrameMotion = 0;
     unsigned lastSecondWarnings = 0;
     double lastFrameMs = 0, lastSimRate = 0, lastPresentRate = 0;
     std::map<std::pair<int, uintptr_t>, ObjectState> observations;
@@ -83,6 +84,7 @@ public:
         if (objects) std::fclose(objects);
         if (sprites) std::fclose(sprites);
         if (interp) std::fclose(interp);
+        if (motion) std::fclose(motion);
         if (invalidSprites) std::fclose(invalidSprites);
         if (skippedSprites) std::fclose(skippedSprites);
         if (events) std::fclose(events);
@@ -106,6 +108,8 @@ public:
             "frame,gameTick,imageId,celColumn,celRow,drawX,drawY\n");
         interp = Open("M2DebugInterpolation.csv",
             "frame,gameTick,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend\n");
+        motion = Open("M2DebugObjectMotion.csv",
+            "frame,gameTick,kind,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend,paused,hasHistory\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
             "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         skippedSprites = Open("M2DebugSkippedSprites.csv",
@@ -113,7 +117,7 @@ public:
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !invalidSprites || !skippedSprites || !events)
+        if (!frames || !objects || !sprites || !interp || !motion || !invalidSprites || !skippedSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
     }
 
@@ -192,6 +196,21 @@ public:
         }
     }
 
+    // Object motion stays separate from the fish-only interpolation trace.
+    void ObjectMotion(Kind kind, const void* object, double x, double y,
+                      int dx, int dy, double blend, bool paused, bool history) {
+        if (!active || (kind != Coin && kind != Food) || !motion ||
+            !SampleDetailFrame(frame) || motionRows >= kTraceRowLimit ||
+            perFrameMotion >= kObjectsPerFrame) return;
+        ++perFrameMotion;
+        std::fprintf(motion,
+            "%llu,%llu,%s,%llu,%.4f,%.4f,%.4f,%.4f,%d,%d,%.5f,%u,%u\n",
+            frame, ticks, Name(kind),
+            static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(object)),
+            x, y, x + dx, y + dy, dx, dy, blend,
+            paused ? 1U : 0U, history ? 1U : 0U);
+        ++motionRows;
+    }
     void SpriteCel(const void* image, int col, int row, int x, int y,
                    int maxCols, int maxRows, int width, int height,
                    const std::string& assetPath) {
@@ -290,7 +309,7 @@ public:
         ++frame;
         for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
         spriteCount = invalidSpriteCount = skippedSpriteCount = celChanges = 0;
-        perFrameObjects = perFrameSprites = 0;
+        perFrameObjects = perFrameSprites = perFrameMotion = 0;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
         if ((frame % 300) == 0) {
@@ -298,6 +317,7 @@ public:
             if (objects) std::fflush(objects);
             if (sprites) std::fflush(sprites);
             if (interp) std::fflush(interp);
+            if (motion) std::fflush(motion);
             if (invalidSprites) std::fflush(invalidSprites);
             if (skippedSprites) std::fflush(skippedSprites);
             if (events) std::fflush(events);
