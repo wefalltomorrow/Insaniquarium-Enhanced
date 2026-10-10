@@ -14,6 +14,7 @@ class FishPetPatchTests(unittest.TestCase):
         self.assertIn("mM2PrevXD = mXD;", changed)
         self.assertIn("mM2PrevYD = mYD;", changed)
         self.assertIn("mM2HavePrev = true;", changed)
+        self.assertIn('extern "C" bool gEnhancedM2Enabled;', changed)
         self.assertIn("if (gEnhancedM2Enabled)", changed)
         self.assertIn("mM2HavePrev = false;", changed)
         self.assertIn("GameObject::UpdateCounters();\n\tBoard* aBoard", changed)
