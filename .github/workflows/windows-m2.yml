@@ -17,14 +17,29 @@ jobs:
     runs-on: windows-2022
     timeout-minutes: 120
     env:
+      # Reuse compiler objects for unchanged pinned port/framework sources.
+      # Increment this namespace when the native compiler or pinned sources change.
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "insaniquarium-m2-p95d4-wf919-v1"
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-sprite-audit-20261010
-      RELEASE_ASSET: InsaniquariumEnhanced-M2SpriteAudit-Win64.zip
+      PUBLIC_TEST_TAG: m2-build-cache-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2CacheTest-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
+
+      # Ninja supports CMake compiler launchers (Visual Studio projects do not).
+      # Keep the same MSVC 2022 x64 toolchain for binary compatibility.
+      - name: Activate MSVC x64 command-line tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up reusable C++ compilation cache
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Check compiler tools
         shell: pwsh
@@ -33,6 +48,10 @@ jobs:
           git --version
           cmake --version
           python --version
+          ninja --version
+          if ($LASTEXITCODE -ne 0) { throw 'Ninja missing' }
+          & $env:SCCACHE_PATH --version
+          if ($LASTEXITCODE -ne 0) { throw 'sccache missing' }
           if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash is required' }
 
       - name: Fetch upstream decomp, native port and framework
@@ -144,6 +163,8 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s m2/tests -p "test_build_cache.py" -v
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC build-cache patch tests failed' }
           cmake -S m2/tests -B m2/tests/build -G "Visual Studio 17 2022" -A x64
           if ($LASTEXITCODE -ne 0) { throw 'M2 timing test configure failed' }
           cmake --build m2/tests/build --config Release
@@ -172,19 +193,36 @@ jobs:
           #define OPENMPT_VERSION_REVISION 0
           '@ | Set-Content -Path (Join-Path $folder 'svn_version.h') -Encoding ascii
 
+      - name: Enable cache-compatible game debug symbols
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/enable_compiler_cache.py
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC debug-info patch failed' }
+
       - name: Configure Windows x64 Release
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          cmake -S upstream/port -B upstream/port/build -G "Visual Studio 17 2022" -A x64 -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
+          cmake -S upstream/port -B upstream/port/build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=$env:SCCACHE_PATH" "-DCMAKE_CXX_COMPILER_LAUNCHER=$env:SCCACHE_PATH" -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
           if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
 
       - name: Compile Windows x64 executable
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          cmake --build upstream/port/build --config Release --parallel 4
+          & $env:SCCACHE_PATH --zero-stats
+          cmake --build upstream/port/build --parallel 4
           if ($LASTEXITCODE -ne 0) { throw 'C++ compilation failed' }
+
+      - name: Show cached vs compiled C++ object statistics
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:SCCACHE_PATH -and (Test-Path $env:SCCACHE_PATH)) {
+            & $env:SCCACHE_PATH --show-stats
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'sccache stats unavailable' }
+          }
 
       - name: Verify executable and create release ZIP
         shell: pwsh
@@ -320,8 +358,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2SpriteAudit-Win64
-          path: release/InsaniquariumEnhanced-M2SpriteAudit-Win64.zip
+          name: InsaniquariumEnhanced-M2CacheTest-Win64
+          path: release/InsaniquariumEnhanced-M2CacheTest-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -333,11 +371,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — Sprite warnings audit
+          ## M2 experimental 60 FPS — Cached Windows build test
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Compiles with the MSVC x64 toolchain and Ninja instead of MSBuild.
+          - Enables GitHub Actions sccache for reuse of unchanged C/C++ objects.
+          - Retains source-level /Z7 symbols and /DEBUG linked PDB.
+          - Reports compiler cache statistics for validation.
+          - No game logic or rendering behaviour was changed by this CI update.
           - Reclassify proven nonrendering laser tail frames and initial
             smoke/explosion -1 cels as skipped, not erroneous draws.
           - Keep original sprite rendering and animation durations unchanged.
@@ -407,7 +450,7 @@ jobs:
             gh release edit $env:PUBLIC_TEST_TAG --prerelease --notes $notes --repo $env:GITHUB_REPOSITORY
             if ($LASTEXITCODE -ne 0) { throw 'Could not update experimental notes' }
           } else {
-            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Sprite Audit (Experimental)' --notes $notes --prerelease
+            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Cached Build Test (Experimental)' --notes $notes --prerelease
             if ($LASTEXITCODE -ne 0) { throw 'Could not publish experimental release' }
           }
           "Direct ZIP: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:PUBLIC_TEST_TAG/$env:RELEASE_ASSET" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
