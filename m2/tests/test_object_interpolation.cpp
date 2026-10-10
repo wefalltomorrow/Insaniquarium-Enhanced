@@ -70,6 +70,23 @@ int main() {
             120, 164, .38701, 96.0);
         Verify(unrelatedTeleport.ShiftX() == 0, "even collected coin guards large teleports");
     }
+    {
+        // Two real alien encounters moved less than 7px per 28ms tick.
+        // Use the ordinary guarded offset, never simulation coordinates.
+        ScopedObjectTranslation<GraphicsProbe> alienSprite(
+            &g, true, false, prev, 197.0, 290.0, 201.4062, 289.8594,
+            201, 290, .5);
+        Verify(alienSprite.ShiftX() < 0, "alien moves between simulation samples");
+        Verify(g.x == alienSprite.ShiftX(), "alien render-only shift active");
+    }
+    Verify(g.x == 0 && g.y == 0, "alien transform is restored");
+    {
+        ScopedObjectTranslation<GraphicsProbe> alienPaused(
+            &g, true, true, prev, 197, 290, 201.4062, 289.8594,
+            201, 290, .5);
+        Verify(alienPaused.ShiftX() == 0 && !prev,
+               "pausing clears alien visual history without moving the sprite");
+    }
     Verify(g.x == 0 && g.y == 0, "all visual translation operations balanced");
     std::puts("PASS M2 coin/food visual interpolation scope and pause guards");
 }
