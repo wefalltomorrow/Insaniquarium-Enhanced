@@ -30,6 +30,7 @@ def main() -> None:
         raise RuntimeError("Run the port source generator before M2 patches.")
 
     shutil.copyfile(ROOT / "m2/FrameClock.hpp", POPLIB / "m2_frameclock.hpp")
+    shutil.copyfile(ROOT / "m2/RenderCoordinates.hpp", GAME / "M2RenderCoordinates.hpp")
 
     app = POPLIB / "appbase.cpp"
     change(app, '#include "appbase.hpp"', '#include "appbase.hpp"\n#include "m2_frameclock.hpp"\n#include <cstdio>', "include independent scheduler")
@@ -141,6 +142,7 @@ double gEnhancedM2Blend = 1.0;
     fish = GAME / "Fish.cpp"
     change(fish, '#include "Fish.h"',
         '''#include "Fish.h"
+#include "M2RenderCoordinates.hpp"
 #include <cmath>
 extern "C" bool gEnhancedM2Enabled;
 extern "C" double gEnhancedM2Blend;''',
@@ -179,17 +181,12 @@ extern "C" double gEnhancedM2Blend;''',
     if (mName.size() > 0)
         DrawName(g, false);''',
         '''    int m2DX = 0, m2DY = 0;
-    if (gEnhancedM2Enabled && mM2HavePrev &&
-        std::abs(mXD - mM2PrevXD) < 48.0 &&
-        std::abs(mYD - mM2PrevYD) < 48.0)
-    {
-        // Graphics is already translated to the fixed simulation mX/mY.
-        // Offset only its drawing transform; clicks/collision/saves stay
-        // entirely on the original 28 ms positions.
-        double rx = mM2PrevXD + (mXD - mM2PrevXD) * gEnhancedM2Blend;
-        double ry = mM2PrevYD + (mYD - mM2PrevYD) * gEnhancedM2Blend;
-        m2DX = static_cast<int>(std::lround(rx)) - mX;
-        m2DY = static_cast<int>(std::lround(ry)) - mY;
+    if (gEnhancedM2Enabled && mM2HavePrev) {
+        // Reject non-finite, extreme or teleporting positions before any
+        // float-to-int conversion. Only the drawing transform is affected.
+        EnhancedM2::SafeFishRenderOffset(
+            mM2PrevXD, mM2PrevYD, mXD, mYD, mX, mY,
+            gEnhancedM2Blend, m2DX, m2DY);
     }
     g->Translate(m2DX, m2DY);
     DrawFish(g, shouldFlip);

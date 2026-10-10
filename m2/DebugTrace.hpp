@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <set>
+#include <limits>
 #include <string>
 #include <utility>
 
@@ -44,6 +46,7 @@ class Recorder {
     unsigned lastSecondWarnings = 0;
     double lastFrameMs = 0, lastSimRate = 0, lastPresentRate = 0;
     std::map<std::pair<int, uintptr_t>, ObjectState> observations;
+    std::set<uintptr_t> reportedUnsafeFish;
     char title[256] = {};
     static constexpr unsigned kObjectsPerFrame = 160;
     static constexpr unsigned kSpritesPerFrame = 220;
@@ -152,6 +155,17 @@ public:
             ++totalTrace;
         }
         previous = {x, y, cel, ticks, frame, true};
+    }
+
+    void UnsafeFishPosition(const void* object, double x, double y) {
+        if (!active || reportedUnsafeFish.size() >= 1024) return;
+        const uintptr_t id = reinterpret_cast<uintptr_t>(object);
+        if (reportedUnsafeFish.insert(id).second) {
+            const double bound = static_cast<double>(std::numeric_limits<int>::max());
+            LogEvent("WARN", "fish_position_outside_safe_render_range",
+                     (!std::isfinite(x) || std::abs(x) > bound) ? 1.0 : 0.0,
+                     (!std::isfinite(y) || std::abs(y) > bound) ? 1.0 : 0.0);
+        }
     }
 
     void RenderOffset(const void* object, double simX, double simY,

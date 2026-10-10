@@ -29,6 +29,8 @@ int main() {
     diag.SpriteCel(&id, -1, 0, 0, 0, 5, 1, 150, 30, "images/chomp");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
+    diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
+    diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
     diag.Begin(16.67, 0.8, 0);
     diag.Drawn(M2Debug::Fish, &id, 12, 20, 3);

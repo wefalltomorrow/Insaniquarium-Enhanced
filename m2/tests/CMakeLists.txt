@@ -9,3 +9,5 @@ add_executable(M2DebugTraceTest test_debug.cpp)
 add_executable(M2PauseInterpolationTest test_pause.cpp)
 
 add_executable(M2EscapePolicyTest test_escape.cpp)
+
+add_executable(M2RenderCoordinatesTest test_render_coordinates.cpp)

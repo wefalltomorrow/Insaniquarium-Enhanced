@@ -102,6 +102,9 @@ def main() -> None:
     change(fish,
            '    g->Translate(m2DX, m2DY);\n    DrawFish(g, shouldFlip);',
            '    g->Translate(m2DX, m2DY);\n'
+           '    if (gEnhancedM2Enabled && mM2HavePrev &&\n'
+           '        !EnhancedM2::RenderablePosition(mXD, mYD))\n'
+           '        M2Debug::Get().UnsafeFishPosition(this, mXD, mYD);\n'
            '    M2Debug::Get().RenderOffset(this, mXD, mYD,\n'
            '                                     m2DX, m2DY, gEnhancedM2Blend);\n'
            '    DrawFish(g, shouldFlip);',
