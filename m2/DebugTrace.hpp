@@ -373,4 +373,24 @@ struct DrawGuard {
     DrawGuard(const DrawGuard&) = delete;
     DrawGuard& operator=(const DrawGuard&) = delete;
 };
+// Snapshot integer coordinates from Shot effects without temporary references.
+struct IntDrawGuard {
+    Kind kind;
+    const void* object;
+    const int &x, &y, &cel;
+    int oldX, oldY, oldCel;
+    bool enabled;
+    IntDrawGuard(Kind k, const void* obj, const int& px,
+                 const int& py, const int& pc) :
+        kind(k), object(obj), x(px), y(py), cel(pc),
+        oldX(px), oldY(py), oldCel(pc), enabled(Get().Active()) {
+        if (enabled) Get().Drawn(kind, object, oldX, oldY, oldCel);
+    }
+    ~IntDrawGuard() {
+        if (enabled) Get().DrawMutation(kind, object,
+            oldX, oldY, oldCel, x, y, cel);
+    }
+    IntDrawGuard(const IntDrawGuard&) = delete;
+    IntDrawGuard& operator=(const IntDrawGuard&) = delete;
+};
 } // namespace M2Debug
