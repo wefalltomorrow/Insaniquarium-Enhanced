@@ -22,9 +22,9 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
 
     def normal(self):
         self.csv("M2DebugFrames.csv",
-                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,drawsFish,drawsCoin,drawsFood,drawsAlien",
-                 [[0, 1, 1, 0, 0, 10.4, 1, 1, 1, 0],
-                  [1, 1, 1, 0, 0, 13.1, 1, 1, 1, 0]])
+                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,drawsFish,drawsCoin,drawsFood,drawsAlien,drawsOtherPet,drawsMissile,drawsShotEffect",
+                 [[0, 1, 1, 0, 0, 10.4, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 13.1, 1, 1, 1, 1, 1, 1, 1]])
         self.csv("M2DebugEvents.csv", "frame,gameTick,severity,event",
                  [[0, 0, "INFO", "debug_enabled"],
                   [0, 1, "INFO", "tank_paused"],
@@ -66,6 +66,25 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
         message, bad = analyze(self.folder)
         self.assertTrue(bad)
         self.assertIn("moving sprites while paused", message)
+
+    def test_nonpresented_frame_details(self):
+        self.normal()
+        self.csv("M2DebugFrames.csv",
+                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,elapsedMs,drawsOtherPet,drawsMissile,drawsShotEffect",
+                 [[42, 24, 0, 0, 0, 9.505, 16.670, 1, 1, 1]])
+        message, bad = analyze(self.folder)
+        self.assertFalse(bad)
+        self.assertIn("frame 42 (tick 24, render 9.505ms", message)
+        self.assertIn("not proof of a monitor drop", message)
+
+    def test_missing_extra_coverage_is_not_claimed(self):
+        self.normal()
+        self.csv("M2DebugFrames.csv",
+                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,drawsFish,drawsCoin,drawsFood,drawsAlien",
+                 [[0, 1, 1, 0, 0, 1.0, 1, 1, 1, 0]])
+        message, bad = analyze(self.folder)
+        self.assertFalse(bad)
+        self.assertIn("extra pet/missile/shot probes not present", message)
 
     def test_missing_frame_file_detected(self):
         message, bad = analyze(self.folder)
