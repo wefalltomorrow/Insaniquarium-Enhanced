@@ -94,8 +94,10 @@ def main() -> None:
                f"count {classname} simulation calls")
         draw_sig = ('void Fish::Draw(Graphics* g)\n{' if classname == "Fish"
                     else f'void PopLib::{classname}::Draw(Graphics* g)\n{{')
+        visual_kind = ('(mType == TYPE_FISH_TYPE_PET ? M2Debug::FishPet : M2Debug::Fish)'
+                       if classname == 'Fish' else 'M2Debug::' + kind)
         change(p, draw_sig, draw_sig +
-               f'\n\tM2Debug::DrawGuard m2DrawGuard(M2Debug::{kind}, this, mXD, mYD, {cel});',
+               f'\n\tM2Debug::DrawGuard m2DrawGuard({visual_kind}, this, mXD, mYD, {cel});',
                f"record {classname} position, animation cel, and draw mutation")
 
     # Read-only probes for un-interpolated pets, missiles and shot effects.
@@ -120,6 +122,17 @@ def main() -> None:
                " m2Probe(M2Debug::" + kind + ", this, " +
                x + ", " + y + ", " + cel + ");",
                "observe " + name + " rendering without changing gameplay")
+
+    # Fish-type pets inherit Fish::Draw but have their own Update().
+    # Count their simulation ticks independently from ordinary guppies.
+    fish_pet = GAME / "FishTypePet.cpp"
+    change(fish_pet, '#include "FishTypePet.h"',
+           '#include "FishTypePet.h"\n#include "M2DebugTrace.hpp"',
+           "include fish-type pet simulation probe")
+    fish_pet_sig = "void PopLib::FishTypePet::Update()\n{"
+    change(fish_pet, fish_pet_sig, fish_pet_sig +
+           "\n\tM2Debug::Get().Updated(M2Debug::FishPet);",
+           "count fish-type pet simulation calls")
 
     fish = GAME / "Fish.cpp"
     change(fish,
