@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-trace-integrity-20261010
-      RELEASE_ASSET: InsaniquariumEnhanced-M2TraceAudit-Win64.zip
+      PUBLIC_TEST_TAG: m2-fish-pet-interp-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2FishPet-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -210,6 +210,13 @@ jobs:
           python m2/apply_alien.py
           if ($LASTEXITCODE -ne 0) { throw 'M2 alien interpolation patch failed' }
 
+      - name: Restore inherited fish-type pet visual history (M2 only)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_fish_pet.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 fish-type pet source patch failed' }
+
       - name: Enable Esc pause-menu keyboard shortcut
         shell: pwsh
         run: |
@@ -382,8 +389,8 @@ jobs:
           Double-click "Start M2.cmd" to enable the experimental 60 Hz
           presentation clock, while retaining 28 ms gameplay updates.
 
-          This is NOT a complete 60 FPS conversion: fish, coin, food and alien
-          sprite positions have render-only interpolation. Other effects
+          This is NOT a complete 60 FPS conversion: ordinary fish, fish-type
+          pets, coins, food and aliens have draw-only positional interpolation. Other effects
           retain their original simulation/animation cadence.
 
           M2 writes M2Timing.log in this folder. Please compare the
@@ -404,6 +411,7 @@ jobs:
           M2DebugObjects.csv: game objects' positions and animation cels.
           Separately traces fish-type and other pets; flags motion and trace caps.
           The log analyzer checks incomplete CSVs and mixed-session ranges.
+          It also reports actual fish-type pet offsets independently of guppies.
           M2DebugSprites.csv: sampled sprite-sheet cel draw operations.
           M2DebugInterpolation.csv: fish simulation vs rendered offsets.
           M2DebugObjectMotion.csv: coin/food/alien render offsets, pause and history.
@@ -453,8 +461,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2TraceAudit-Win64
-          path: release/InsaniquariumEnhanced-M2TraceAudit-Win64.zip
+          name: InsaniquariumEnhanced-M2FishPet-Win64
+          path: release/InsaniquariumEnhanced-M2FishPet-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -466,11 +474,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — Complete Trace Audit
+          ## M2 experimental 60 FPS — Fish-Type Pet Interpolation
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Fix fish-type pets bypassing Fish::Update interpolation history;
+            their inherited Fish::Draw can now render smoothed positions.
+          - Move fish-type pet music/game callback back to 28ms simulation
+            ticks in M2 mode; preserve original non-M2 behaviour.
+          - Report fish vs fish-type pet actual render-offset coverage.
+          - Preserve existing fish/coin/food/alien motion and original AI/hitboxes.
           - Check all trace CSVs for malformed/truncated rows and mixed captures.
           - Detect 350,000-row trace caps and sample stream end-frame differences.
           - Separate fish-type pets from guppies; report moving vs stationary pets.
@@ -602,7 +616,7 @@ jobs:
               $code = $LASTEXITCODE
             }
           } else {
-            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Trace Integrity (Experimental)' --notes $notes --prerelease 2>&1
+            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Fish-Type Pet Interpolation (Experimental)' --notes $notes --prerelease 2>&1
             $code = $LASTEXITCODE
           }
           if ($code -ne 0) {
