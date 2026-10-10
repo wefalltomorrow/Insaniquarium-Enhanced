@@ -82,7 +82,7 @@ int main() {
            "frame CSV header exists");
     Verify(std::strstr(frameHeader, "updatesOtherPet") != nullptr &&
            std::strstr(frameHeader, "drawsMissile") != nullptr &&
-           std::strstr(frameHeader, "drawsShotEffect") != nullptr,
+           std::strstr(frameHeader, "drawsShotEffect") != nullptr &&
            std::strstr(frameHeader, "updatesFishPet") != nullptr &&
            std::strstr(frameHeader, "drawsFishPet") != nullptr,
            "additional object counts exist in frame CSV");
