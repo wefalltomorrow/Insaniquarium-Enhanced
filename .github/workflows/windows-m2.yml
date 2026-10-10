@@ -203,6 +203,13 @@ jobs:
           python m2/apply_coin_food.py
           if ($LASTEXITCODE -ne 0) { throw 'M2 coin/food source patch failed' }
 
+      - name: Interpolate alien sprites at 60 FPS (M2 opt-in)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_alien.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 alien interpolation patch failed' }
+
       - name: Enable Esc pause-menu keyboard shortcut
         shell: pwsh
         run: |
@@ -461,6 +468,11 @@ jobs:
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Add render-only alien movement interpolation with 48px teleport guard.
+          - Record alien offsets in M2DebugObjectMotion.csv for in-game verification.
+          - Preserve original 28ms AI, targeting, collisions and save state.
+          - Run sound callback only on simulation ticks in M2 mode.
+          - Include alien motion and pause regression tests.
           - Adds read-only probes for OtherTypePet, Missle and Shot update/draw calls.
           - Detects effects changing object positions or animation cells during redraws.
           - Automatic log report lists exact non-presented frames and which object
