@@ -11,3 +11,5 @@ add_executable(M2PauseInterpolationTest test_pause.cpp)
 add_executable(M2EscapePolicyTest test_escape.cpp)
 
 add_executable(M2RenderCoordinatesTest test_render_coordinates.cpp)
+
+add_executable(M2ObjectInterpolationTest test_object_interpolation.cpp)

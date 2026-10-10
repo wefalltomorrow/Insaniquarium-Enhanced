@@ -97,6 +97,16 @@ approximately 311,000 object rows rather than exhausting 350,000
 rows before the session ends. The ratio is a budget estimate, not a claim
 that the new recorder has been tested in-game.
 
+### Coin and food interpolation (experimental)
+
+M2 now applies scoped, render-only positional interpolation to coin and food
+sprites, in addition to fish. Object movement/collision coordinates and save
+data stay on the original 28 ms simulation ticks; visual transforms are restored
+even on early Draw returns. During M2 mode, coin/food fish-song updates run on
+simulation ticks, not repeated presentation calls. The patch is opt-in and
+does not change the M1.2 stable release. Windows CI has source-anchor checks
+and tests for pause, teleport and invalid-position safety.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
