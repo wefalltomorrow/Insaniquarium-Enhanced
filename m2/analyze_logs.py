@@ -11,6 +11,7 @@ import csv
 from pathlib import Path
 import re
 import statistics
+from trace_integrity import audit_traces, audit_object_movement
 
 def rows(folder: Path, filename: str):
     path = folder / filename
@@ -171,6 +172,18 @@ def analyze(folder: Path):
             notes.append("INFO: {} missing or contains no samples.".format(filename))
     report.append("Detailed trace latest frames: " + ", ".join(
         "{}={}".format(k, v) for k, v in detail_last.items()))
+    integrity, integrity_notes = audit_traces(folder, last_frame)
+    if integrity:
+        report.append("")
+        report.append("Trace integrity (complete files required for definitive analysis):")
+        report.extend("- " + entry for entry in integrity)
+    notes.extend(integrity_notes)
+    movement, movement_notes = audit_object_movement(folder)
+    if movement:
+        report.append("")
+        report.append("Other-object simulation motion (NOT 60 FPS animation proof):")
+        report.extend("- " + entry for entry in movement)
+    notes.extend(movement_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
     report.append("presentation, visual smoothness, audio fidelity and all gameplay modes")
     report.append("require separate observation/testing.")
