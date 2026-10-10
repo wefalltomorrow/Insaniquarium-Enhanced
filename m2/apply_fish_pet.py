@@ -20,6 +20,7 @@ ANCHOR = (
     "\tGameObject::UpdateCounters();"
 )
 REPLACEMENT = (
+    'extern "C" bool gEnhancedM2Enabled;\n\n'
     "void PopLib::FishTypePet::Update()\n"
     "{\n"
     "\tM2Debug::Get().Updated(M2Debug::FishPet);\n"
