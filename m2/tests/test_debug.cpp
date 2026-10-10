@@ -16,6 +16,14 @@ int main() {
 #else
     setenv("INSANIQUARIUM_M2_DEBUG", "1", 1);
 #endif
+    // Regression coverage for long-session trace sampling; no changes
+    // to sprite warnings, per-frame counters or simulation are permitted.
+    Verify(M2Debug::Recorder::SampleDetailFrame(0), "first frame traced");
+    Verify(M2Debug::Recorder::SampleDetailFrame(9999), "initial full-detail window");
+    Verify(!M2Debug::Recorder::SampleDetailFrame(10000), "late unsampled frame");
+    Verify(!M2Debug::Recorder::SampleDetailFrame(10001), "late adjacent frame");
+    Verify(M2Debug::Recorder::SampleDetailFrame(10002), "late sampled frame");
+    Verify(M2Debug::Recorder::SampleDetailFrame(30000), "long session still sampled");
     auto& diag = M2Debug::Get();
     Verify(diag.Active(), "debug opt-in");
     diag.Begin(16.67, 0.3, 1);

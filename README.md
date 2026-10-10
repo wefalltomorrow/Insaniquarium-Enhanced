@@ -85,6 +85,18 @@ above remains the known-good release.
 Neither cache includes original PopCap game assets. Normal source and
 gameplay behaviour is unchanged, and existing PE x64/release checks remain.
 
+### Longer M2 diagnostics
+
+Detailed object and fish interpolation traces now record every presentation
+frame through frame 9,999, then one out of every three frames thereafter.
+Each stream retains its own 350,000-row cap. This reduces premature
+truncation during extended tests while keeping per-frame timing, all warning
+checks, skipped/invalid sprite classification and game behaviour unchanged.
+On the 27,259-frame CacheWarm log, the new scheme would require
+approximately 311,000 object rows rather than exhausting 350,000
+rows before the session ends. The ratio is a budget estimate, not a claim
+that the new recorder has been tested in-game.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt

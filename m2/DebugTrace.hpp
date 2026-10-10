@@ -88,6 +88,13 @@ public:
         if (events) std::fclose(events);
     }
     bool Active() const { return active; }
+    // Full object/interpolation detail for the first ~167 seconds at 60 FPS.
+    // Later, sample every third presentation frame so the 350k-row
+    // per-stream budgets cover longer sessions without growing huge logs.
+    // Warning detection and per-frame totals ALWAYS run at full cadence.
+    static bool SampleDetailFrame(unsigned long long presentFrame) {
+        return presentFrame < 10000ULL || (presentFrame % 3ULL) == 0ULL;
+    }
     void Start() {
         if (!active || opened) return;
         opened = true;
@@ -148,7 +155,7 @@ public:
         if (repeated && moved)
             LogEvent("WARN", "simulation_position_changed_without_game_tick",
                      static_cast<double>(kind), static_cast<double>(since));
-        if (objects && objectRows < kTraceRowLimit &&
+        if (objects && SampleDetailFrame(frame) && objectRows < kTraceRowLimit &&
             perFrameObjects++ < kObjectsPerFrame) {
             std::fprintf(objects, "%llu,%llu,%s,%llu,%.4f,%.4f,%d,%u,%u,%u,%llu\n",
                          frame, ticks, Name(kind),
@@ -177,7 +184,7 @@ public:
             LogEvent("ERROR", "nonfinite_fish_render_offset", dx, dy);
         if (std::abs(dx) > 50.0 || std::abs(dy) > 50.0)
             LogEvent("WARN", "large_fish_interpolation_offset", dx, dy);
-        if (interp && interpRows < kTraceRowLimit && perFrameObjects < kObjectsPerFrame) {
+        if (interp && SampleDetailFrame(frame) && interpRows < kTraceRowLimit && perFrameObjects < kObjectsPerFrame) {
             std::fprintf(interp, "%llu,%llu,%llu,%.4f,%.4f,%.4f,%.4f,%.4f,%.4f,%.5f\n",
                          frame, ticks, static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(object)),
                          simX, simY, simX + dx, simY + dy, dx, dy, blend);

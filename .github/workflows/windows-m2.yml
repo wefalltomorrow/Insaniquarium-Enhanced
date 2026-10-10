@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-module-scan-test-20261010
-      RELEASE_ASSET: InsaniquariumEnhanced-M2NoModuleScan-Win64.zip
+      PUBLIC_TEST_TAG: m2-long-trace-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2LongTrace-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -371,6 +371,9 @@ jobs:
           M2DebugObjects.csv: game objects' positions and animation cels.
           M2DebugSprites.csv: sampled sprite-sheet cel draw operations.
           M2DebugInterpolation.csv: fish simulation vs rendered offsets.
+          Objects/interpolation trace every frame through frame 9,999;
+          then every third frame, keeping useful long-session coverage.
+          Per-frame timing and all warning checks remain continuous.
           M2DebugEvents.csv: warnings on timing and draw-state changes.
           M2DebugInvalidSprites.csv: unexpected out-of-range sprite calls.
           M2DebugSkippedSprites.csv: non-rendered animation frames, including
@@ -408,8 +411,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2NoModuleScan-Win64
-          path: release/InsaniquariumEnhanced-M2NoModuleScan-Win64.zip
+          name: InsaniquariumEnhanced-M2LongTrace-Win64
+          path: release/InsaniquariumEnhanced-M2LongTrace-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -421,11 +424,15 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — CMake C++ module-scan optimisation test
+          ## M2 experimental 60 FPS — Longer-session diagnostic sampling
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Full object and fish-interpolation detail for the first 10,000
+            presentation frames; every third frame thereafter for longer sessions.
+          - Keeps continuous frame timing and source-level warnings at all times.
+          - Leaves independent 350,000-row CSV limits and gameplay unchanged.
           - Disables unnecessary C++20 module scanning in the pinned game and framework
             builds; no C++20 module sources are expected in this native port.
           - Keeps the previous verified source and compiler caches.
@@ -529,7 +536,7 @@ jobs:
               $code = $LASTEXITCODE
             }
           } else {
-            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Module Scan Test (Experimental)' --notes $notes --prerelease 2>&1
+            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Long Trace Test (Experimental)' --notes $notes --prerelease 2>&1
             $code = $LASTEXITCODE
           }
           if ($code -ne 0) {
