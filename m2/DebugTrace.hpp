@@ -15,9 +15,9 @@
 #include <utility>
 
 namespace M2Debug {
-enum Kind { Board = 0, Fish = 1, Coin = 2, Food = 3, Alien = 4, Kinds = 5 };
+enum Kind { Board = 0, Fish = 1, Coin = 2, Food = 3, Alien = 4, OtherPet = 5, Missile = 6, ShotEffect = 7, Kinds = 8 };
 inline const char* Name(Kind k) {
-    static const char* names[] = {"board", "fish", "coin", "food", "alien"};
+    static const char* names[] = {"board", "fish", "coin", "food", "alien", "other_pet", "missile", "shot_effect"};
     return names[static_cast<int>(k)];
 }
 struct ObjectState {
@@ -101,7 +101,7 @@ public:
         if (!active || opened) return;
         opened = true;
         frames = Open("M2DebugFrames.csv",
-            "frame,scheduledTicks,actualTicksSincePreviousPresent,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings,expectedSkippedCels\n");
+            "frame,scheduledTicks,actualTicksSincePreviousPresent,totalSimTicks,presentRequested,presented,elapsedMs,renderMs,blend,updatesBoard,updatesFish,updatesCoin,updatesFood,updatesAlien,drawsBoard,drawsFish,drawsCoin,drawsFood,drawsAlien,spriteCels,invalidCels,celChanges,warnings,expectedSkippedCels,updatesOtherPet,updatesMissile,updatesShotEffect,drawsOtherPet,drawsMissile,drawsShotEffect\n");
         objects = Open("M2DebugObjects.csv",
             "frame,gameTick,kind,objectId,simulationX,simulationY,animationCel,changedCel,simMoved,repeatDraw,simTicksSinceLastDraw\n");
         sprites = Open("M2DebugSprites.csv",
@@ -297,14 +297,16 @@ public:
             LogEvent("WARN", "slow_render_ms", renderMs);
         if (frames)
             std::fprintf(frames,
-                "%llu,%d,%llu,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+                "%llu,%d,%llu,%llu,%u,%u,%.4f,%.4f,%.6f,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
                 frame, simSteps, ticks - lastReportedTick, ticks,
                 requested, presented, elapsed,
                 renderMs, blend, update[Board], update[Fish], update[Coin],
                 update[Food], update[Alien], draw[Board], draw[Fish],
                 draw[Coin], draw[Food], draw[Alien], spriteCount,
                 invalidSpriteCount, celChanges, currentWarnings,
-                skippedSpriteCount);
+                skippedSpriteCount,
+                update[OtherPet], update[Missile], update[ShotEffect],
+                draw[OtherPet], draw[Missile], draw[ShotEffect]);
         lastReportedTick = ticks;
         ++frame;
         for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
