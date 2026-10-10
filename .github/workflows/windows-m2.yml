@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-boundary-audit-20261010
-      RELEASE_ASSET: InsaniquariumEnhanced-M2BoundaryAudit-Win64.zip
+      PUBLIC_TEST_TAG: m2-source-cache-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2SourceCache-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -54,7 +54,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'sccache missing' }
           if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash is required' }
 
+      # Cache the exact, immutable pinned source checkouts BEFORE the
+      # game port generates/patches files or Ninja writes build products.
+      # This is separate from sccache, which reuses compiled C/C++ objects.
+      - name: Restore pinned game and dependency sources
+        id: source-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: upstream
+          key: m2-sources-v1-${{ runner.os }}-${{ env.PORT_COMMIT }}-${{ env.WINFISH_COMMIT }}
+
       - name: Fetch upstream decomp, native port and framework
+        if: steps.source-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -82,6 +93,37 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Unable to select latest WinFish source' }
           if (-not (Test-Path upstream/external/winfish/source/WinFish/WinFishApp.cpp)) { throw 'WinFish source missing' }
           if (-not (Test-Path upstream/poplib/PopLib/appbase.cpp)) { throw 'PopLib source missing' }
+
+      - name: Verify immutable pinned checkout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'upstream/port/port.sh')) { throw 'Native port is missing' }
+          if (-not (Test-Path 'upstream/poplib/PopLib/appbase.cpp')) { throw 'PopLib is missing' }
+          if (-not (Test-Path 'upstream/external/winfish/source/WinFish/WinFishApp.cpp')) { throw 'WinFish is missing' }
+          if (-not (Test-Path 'upstream/poplib/external/SDL_ttf/external/freetype/CMakeLists.txt')) { throw 'FreeType is missing' }
+          $portSha = (git -C upstream rev-parse HEAD).Trim()
+          $fishSha = (git -C upstream/external/winfish rev-parse HEAD).Trim()
+          $poplibExpected = (git -C upstream rev-parse HEAD:poplib).Trim()
+          $poplibSha = (git -C upstream/poplib rev-parse HEAD).Trim()
+          if ($portSha -ne $env:PORT_COMMIT) { throw "Port revision mismatch: $portSha" }
+          if ($fishSha -ne $env:WINFISH_COMMIT) { throw "Game revision mismatch: $fishSha" }
+          if ($poplibSha -ne $poplibExpected) { throw "Framework revision mismatch: $poplibSha" }
+          Write-Host "Validated pinned source revisions: native port, WinFish, PopLib"
+          if ("${{ steps.source-cache.outputs.cache-hit }}" -eq "true") {
+            Write-Host "Reused unchanged source checkout from GitHub Actions cache"
+          } else {
+            Write-Host "Fetched clean pinned source checkout (cache miss)"
+          }
+
+      # Save immediately while upstream/ is still unmodified. Saving at
+      # the end of a job would include port-generated C++ and build outputs.
+      - name: Save immutable source checkout for future runs
+        if: steps.source-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: upstream
+          key: m2-sources-v1-${{ runner.os }}-${{ env.PORT_COMMIT }}-${{ env.WINFISH_COMMIT }}
 
       - name: Reconcile upstream gamefix overlap
         shell: pwsh
@@ -359,8 +401,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2BoundaryAudit-Win64
-          path: release/InsaniquariumEnhanced-M2BoundaryAudit-Win64.zip
+          name: InsaniquariumEnhanced-M2SourceCache-Win64
+          path: release/InsaniquariumEnhanced-M2SourceCache-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -372,11 +414,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — Exact sprite boundary audit
+          ## M2 experimental 60 FPS — Source checkout cache test
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Reuses verified pinned game/framework/dependency sources via
+            GitHub Actions cache, skipping repeated Git clones on cache hits.
+          - Cache is saved before any generated or patched game files exist.
+          - Keeps the existing MSVC/Ninja/sccache compiler object cache.
+          - Makes no game simulation, rendering or sprite behaviour changes.
           - Classifies exact terminal warp and egg hidden frames as skipped.
           - Preserves the original drawing and flags malformed near-misses.
           - Uses independent object, sprite and interpolation CSV row budgets.
@@ -454,7 +501,7 @@ jobs:
             gh release edit $env:PUBLIC_TEST_TAG --prerelease --notes $notes --repo $env:GITHUB_REPOSITORY
             if ($LASTEXITCODE -ne 0) { throw 'Could not update experimental notes' }
           } else {
-            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Boundary Audit (Experimental)' --notes $notes --prerelease
+            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Source Cache Test (Experimental)' --notes $notes --prerelease
             if ($LASTEXITCODE -ne 0) { throw 'Could not publish experimental release' }
           }
           "Direct ZIP: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:PUBLIC_TEST_TAG/$env:RELEASE_ASSET" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
