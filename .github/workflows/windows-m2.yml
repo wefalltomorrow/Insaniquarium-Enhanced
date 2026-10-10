@@ -1,0 +1,646 @@
+name: M2 experimental fixed-step Windows x64
+
+on:
+  push:
+    branches: [feature/m2-fixed-timestep]
+    paths:
+      - ".github/workflows/windows-m2.yml"
+      - "m2/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-x64:
+    name: Compile and package Insaniquarium Enhanced
+    runs-on: windows-2022
+    timeout-minutes: 120
+    env:
+      # Reuse compiler objects for unchanged pinned port/framework sources.
+      # Increment this namespace when the native compiler or pinned sources change.
+      SCCACHE_GHA_ENABLED: "true"
+      SCCACHE_GHA_VERSION: "insaniquarium-m2-p95d4-wf919-v1"
+      SCCACHE_IGNORE_SERVER_IO_ERROR: "1"
+      PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
+      WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
+      RELEASE_TAG: v0.3.0-m2-timing-test
+      PUBLIC_TEST_TAG: m2-other-pet-interp-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2OtherPet-Win64.zip
+    steps:
+      - name: Checkout release workflow
+        uses: actions/checkout@v4
+
+      # Ninja supports CMake compiler launchers (Visual Studio projects do not).
+      # Keep the same MSVC 2022 x64 toolchain for binary compatibility.
+      - name: Activate MSVC x64 command-line tools
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Set up reusable C++ compilation cache
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      - name: Check compiler tools
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git --version
+          cmake --version
+          python --version
+          ninja --version
+          if ($LASTEXITCODE -ne 0) { throw 'Ninja missing' }
+          & $env:SCCACHE_PATH --version
+          if ($LASTEXITCODE -ne 0) { throw 'sccache missing' }
+          if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash is required' }
+
+      # Cache the exact, immutable pinned source checkouts BEFORE the
+      # game port generates/patches files or Ninja writes build products.
+      # This is separate from sccache, which reuses compiled C/C++ objects.
+      - name: Restore pinned game and dependency sources
+        id: source-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: upstream
+          key: m2-sources-v1-${{ runner.os }}-${{ env.PORT_COMMIT }}-${{ env.WINFISH_COMMIT }}
+
+      - name: Fetch upstream decomp, native port and framework
+        if: steps.source-cache.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          git config --global core.longpaths true
+          git clone https://github.com/SaMeiers/insaniquarium-port.git upstream
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to clone native port' }
+          git -C upstream checkout $env:PORT_COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to select tested native port revision' }
+          # Do not fetch optional Discord RPC: its upstream is unavailable,
+          # and FEATURE_DISCORD_RPC is disabled for this build.
+          git -C upstream submodule update --init --jobs 6
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch game/framework submodules' }
+          $required = @(
+            'external/SDL', 'external/SDL_ttf', 'external/curl',
+            'external/miniaudio', 'external/ogg', 'external/openal',
+            'external/tinyxml2', 'external/vorbis', 'external/zlib'
+          )
+          git -C upstream/poplib submodule update --init --jobs 6 -- $required
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch required framework dependencies' }
+          # SDL_ttf keeps FreeType, HarfBuzz, etc. in its own submodules.
+          git -C upstream/poplib/external/SDL_ttf submodule update --init --recursive --jobs 4
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to fetch font dependencies' }
+          # Upgrade only the game source. Preserve the known-good port/framework revision.
+          git -C upstream/external/winfish checkout $env:WINFISH_COMMIT
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to select latest WinFish source' }
+          if (-not (Test-Path upstream/external/winfish/source/WinFish/WinFishApp.cpp)) { throw 'WinFish source missing' }
+          if (-not (Test-Path upstream/poplib/PopLib/appbase.cpp)) { throw 'PopLib source missing' }
+
+      - name: Verify immutable pinned checkout
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path 'upstream/port/port.sh')) { throw 'Native port is missing' }
+          if (-not (Test-Path 'upstream/poplib/PopLib/appbase.cpp')) { throw 'PopLib is missing' }
+          if (-not (Test-Path 'upstream/external/winfish/source/WinFish/WinFishApp.cpp')) { throw 'WinFish is missing' }
+          if (-not (Test-Path 'upstream/poplib/external/SDL_ttf/external/freetype/CMakeLists.txt')) { throw 'FreeType is missing' }
+          $portSha = (git -C upstream rev-parse HEAD).Trim()
+          $fishSha = (git -C upstream/external/winfish rev-parse HEAD).Trim()
+          $poplibExpected = (git -C upstream rev-parse HEAD:poplib).Trim()
+          $poplibSha = (git -C upstream/poplib rev-parse HEAD).Trim()
+          if ($portSha -ne $env:PORT_COMMIT) { throw "Port revision mismatch: $portSha" }
+          if ($fishSha -ne $env:WINFISH_COMMIT) { throw "Game revision mismatch: $fishSha" }
+          if ($poplibSha -ne $poplibExpected) { throw "Framework revision mismatch: $poplibSha" }
+          Write-Host "Validated pinned source revisions: native port, WinFish, PopLib"
+          if ("${{ steps.source-cache.outputs.cache-hit }}" -eq "true") {
+            Write-Host "Reused unchanged source checkout from GitHub Actions cache"
+            "Upstream source cache: **HIT** (verified pinned revisions)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          } else {
+            Write-Host "Fetched clean pinned source checkout (cache miss)"
+            "Upstream source cache: **MISS** (pinned sources downloaded)" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+          }
+
+      # Save immediately while upstream/ is still unmodified. Saving at
+      # the end of a job would include port-generated C++ and build outputs.
+      - name: Save immutable source checkout for future runs
+        if: steps.source-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: upstream
+          key: m2-sources-v1-${{ runner.os }}-${{ env.PORT_COMMIT }}-${{ env.WINFISH_COMMIT }}
+
+      - name: Reconcile upstream gamefix overlap
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/prepare_source.py
+          if ($LASTEXITCODE -ne 0) { throw 'Latest WinFish fix reconciliation failed' }
+
+      - name: Generate portable game source
+        shell: bash
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          bash port/port.sh 2>&1 | tee port-generate.log
+          if grep -E '\[FAILED\]|WARNING:' port-generate.log; then
+            echo 'Port generator reported failed source transformations.'
+            exit 1
+          fi
+          test -f port/winfish/WinFishApp.cpp
+          test -f port/winfish/Board.cpp
+
+      - name: Apply Enhanced Options menu updates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/menu_updates.py
+          if ($LASTEXITCODE -ne 0) { throw 'Options menu patch failed' }
+
+      - name: Install in-game GitHub release updater
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m1/apply_updater.py $env:RELEASE_TAG
+          if ($LASTEXITCODE -ne 0) { throw 'Enhanced updater patch failed' }
+
+      - name: Remove obsolete Hardware Acceleration control
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/disable_legacy_ha.py
+          if ($LASTEXITCODE -ne 0) { throw 'Legacy hardware acceleration fix failed' }
+
+      - name: Initialise horizontal velocity for newly spawned fish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/fix_fish_velocity.py
+          if ($LASTEXITCODE -ne 0) { throw 'New fish velocity initialisation failed' }
+
+      - name: Apply opt-in 60 FPS fixed-step experiment
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 rendering patch failed verification' }
+
+      - name: Apply opt-in animation and timing diagnostics
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_debug.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 debug source instrumentation failed' }
+
+      - name: Fix render interpolation during gameplay pause
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_pause_fix.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 pause interpolation patch failed verification' }
+
+      - name: Add M2 render-only coin and food interpolation
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_coin_food.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 coin/food source patch failed' }
+
+      - name: Interpolate alien sprites at 60 FPS (M2 opt-in)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_alien.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 alien interpolation patch failed' }
+
+      - name: Restore inherited fish-type pet visual history (M2 only)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_fish_pet.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 fish-type pet source patch failed' }
+
+      - name: Interpolate other-type pet sprite movement (M2 opt-in)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_other_pet.py
+          if ($LASTEXITCODE -ne 0) { throw 'M2 other-pet source patch failed' }
+
+      - name: Enable Esc pause-menu keyboard shortcut
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/apply_escape.py
+          if ($LASTEXITCODE -ne 0) { throw 'Esc pause-menu patch failed' }
+
+      - name: Test independent 28ms game / 60Hz presentation pacing
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m unittest discover -s m2/tests -p "test_*.py" -v
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC build-cache patch tests failed' }
+          cmake -S m2/tests -B m2/tests/build -G "Visual Studio 17 2022" -A x64
+          if ($LASTEXITCODE -ne 0) { throw 'M2 timing test configure failed' }
+          cmake --build m2/tests/build --config Release
+          if ($LASTEXITCODE -ne 0) { throw 'M2 timing test compile failed' }
+          & "m2/tests/build/Release/M2FrameClockTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'M2 timing test assertions failed' }
+          & "m2/tests/build/Release/M2DebugTraceTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'M2 verbose recorder smoke test failed' }
+          & "m2/tests/build/Release/M2PauseInterpolationTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'M2 pause regression test failed' }
+          & "m2/tests/build/Release/M2EscapePolicyTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Esc pause shortcut regression test failed' }
+          & "m2/tests/build/Release/M2RenderCoordinatesTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Render-only coordinate safety test failed' }
+          & "m2/tests/build/Release/M2ObjectInterpolationTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'M2 coin/food interpolation test failed' }
+
+      - name: Generate missing libopenmpt version metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          # The vendored libopenmpt source omits its VCS-generated header.
+          # A packaged build has no SVN revision, so advertise revision zero.
+          $folder = 'upstream/poplib/external/libopenmpt/build/svn_version'
+          New-Item -Path $folder -ItemType Directory -Force | Out-Null
+          @'
+          #pragma once
+          #define OPENMPT_VERSION_REVISION 0
+          '@ | Set-Content -Path (Join-Path $folder 'svn_version.h') -Encoding ascii
+
+      - name: Enable cache-compatible game debug symbols
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/enable_compiler_cache.py
+          if ($LASTEXITCODE -ne 0) { throw 'MSVC debug-info patch failed' }
+
+      - name: Configure Windows x64 Release
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cmake -S upstream/port -B upstream/port/build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=$env:SCCACHE_PATH" "-DCMAKE_CXX_COMPILER_LAUNCHER=$env:SCCACHE_PATH" -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
+          if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
+
+      - name: Compile Windows x64 executable
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & $env:SCCACHE_PATH --zero-stats
+          # Use extra concurrency for mostly cached object fetches,
+          # without oversubscribing low-core Windows hosted runners.
+          $cores = [Environment]::ProcessorCount
+          $workers = [Math]::Min(6, [Math]::Max(2, $cores + 2))
+          Write-Host "Ninja workers: $workers (logical CPUs: $cores)"
+          cmake --build upstream/port/build --parallel $workers
+          if ($LASTEXITCODE -ne 0) { throw 'C++ compilation failed' }
+
+      - name: Show cached vs compiled C++ object statistics
+        if: always()
+        shell: pwsh
+        run: |
+          if ($env:SCCACHE_PATH -and (Test-Path $env:SCCACHE_PATH)) {
+            & $env:SCCACHE_PATH --show-stats
+            if ($LASTEXITCODE -ne 0) { Write-Warning 'sccache stats unavailable' }
+          }
+
+      - name: Verify executable and create release ZIP
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe = Join-Path $PWD 'upstream/port/bin/Insaniquarium.exe'
+          if (-not (Test-Path $exe)) { throw "Expected executable missing: $exe" }
+          if ((Get-Item $exe).Length -lt 100000) { throw 'Executable unexpectedly small' }
+
+          $stream = [System.IO.File]::OpenRead($exe)
+          try {
+            $reader = [System.IO.BinaryReader]::new($stream)
+            $stream.Position = 0x3c
+            $peOffset = $reader.ReadInt32()
+            $stream.Position = $peOffset
+            if ($reader.ReadUInt32() -ne 0x4550) { throw 'PE signature missing' }
+            $machine = $reader.ReadUInt16()
+            if ($machine -ne 0x8664) { throw ("Not a Windows x64 executable: {0:X4}" -f $machine) }
+            $stream.Position = $peOffset + 24
+            if ($reader.ReadUInt16() -ne 0x20b) { throw 'Expected PE32+ (x64) image' }
+          } finally {
+            $stream.Dispose()
+          }
+
+          New-Item -ItemType Directory -Path release -Force | Out-Null
+          New-Item -ItemType Directory -Path stage -Force | Out-Null
+          Copy-Item $exe 'stage/InsaniquariumEnhanced.exe'
+          @'
+          Insaniquarium Enhanced M2 timing test - Windows x64
+
+          This executable is compiled from the original WinFish decompilation
+          using SaMeiers' native SDL3/PopLib port.
+
+          TO PLAY:
+          Copy these directories from your own Insaniquarium Deluxe installation
+          into this folder, alongside InsaniquariumEnhanced.exe:
+            data, images, music, properties, sounds, fishsongs
+
+          Original PopCap assets are NOT contained in this archive.
+          CHECK UPDATES compares this build with GitHub published releases
+          and offers a ZIP download when a newer Windows x64 build exists.
+
+          M2 test uses WinFish f919b3c (8 Oct 2026); native 4K and
+          interpolation for other moving objects are not yet implemented.
+          Obsolete Hardware Acceleration toggle removed; SDL3 keeps its GPU renderer.
+          Windows x64 executable architecture and compilation are CI-verified,
+          but runtime gameplay has not been verified by CI.
+
+          Source:
+          https://github.com/wefalltomorrow/Insaniquarium-Enhanced
+          https://github.com/SaMeiers/insaniquarium-port
+          https://github.com/Vindirect/WinFish
+          https://github.com/SaMeiers/PopLib
+
+          Port source revision: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
+          Game source revision: f919b3c241cfd611c547f1653fb3514f500f761b
+          Licensed source, framework and original notices: see linked repositories.
+          '@ | Set-Content -Path stage/README.txt -Encoding utf8
+          @'
+          @echo off
+          cd /d "%~dp0"
+          set "INSANIQUARIUM_M2_60FPS=1"
+          start "" "%~dp0InsaniquariumEnhanced.exe"
+          '@ | Set-Content -Path 'stage/Start M2.cmd' -Encoding ascii
+          @'
+          @echo off
+          cd /d "%~dp0"
+          set "INSANIQUARIUM_M2_60FPS=1"
+          set "INSANIQUARIUM_M2_DEBUG=1"
+          echo M2 verbose diagnostics enabled.
+          echo Play for 30-60 seconds and then send the M2Debug*.csv files.
+          start "" "%~dp0InsaniquariumEnhanced.exe"
+          '@ | Set-Content -Path 'stage/Start M2 Debug.cmd' -Encoding ascii
+          Copy-Item 'm2/analyze_logs.py' 'stage/AnalyzeM2Logs.py'
+          Copy-Item 'm2/trace_integrity.py' 'stage/trace_integrity.py'
+          @'
+          @echo off
+          cd /d "%~dp0"
+          where py >nul 2>nul
+          if not errorlevel 1 (
+            py -3 AnalyzeM2Logs.py --directory . --output M2DiagnosticReport.txt
+          ) else (
+            python AnalyzeM2Logs.py --directory . --output M2DiagnosticReport.txt
+          )
+          echo.
+          echo Check M2DiagnosticReport.txt in this folder.
+          pause
+          '@ | Set-Content -Path 'stage/Analyze M2 Logs.cmd' -Encoding ascii
+          @'
+          INSANIQUARIUM ENHANCED M2 - EXPERIMENTAL TIMING TEST
+
+          Double-click "Start M2.cmd" to enable the experimental 60 Hz
+          presentation clock, while retaining 28 ms gameplay updates.
+
+          This is NOT a complete 60 FPS conversion: ordinary fish, both pet
+          categories, coins, food and aliens have draw-only position interpolation. Other effects
+          retain their original simulation/animation cadence.
+
+          M2 writes M2Timing.log in this folder. Please compare the
+          sim= rate (~35.7 Hz) and present= rate (~60 Hz). Gameplay speed,
+          sound, menus, and fish behaviour should remain normal.
+
+          Start InsaniquariumEnhanced.exe normally to disable the experiment
+          and use the unchanged M1.2 rendering behaviour.
+
+          Required original game asset directories next to this exe:
+          data, images, music, properties, sounds, fishsongs.
+
+          To collect detailed diagnostic logs, launch Start M2 Debug.cmd
+          instead. This also enables the same experimental 60 FPS mode.
+          M2DebugFrames.csv: per-present timing and counts.
+          Also counts OtherTypePet draws, missiles and shot effects independently;
+          missing object activity means untested, not proven smooth.
+          M2DebugObjects.csv: game objects' positions and animation cels.
+          Separately traces fish-type and other pets; flags motion and trace caps.
+          The log analyzer checks incomplete CSVs and mixed-session ranges.
+          It also reports actual fish-type pet offsets independently of guppies.
+          M2DebugSprites.csv: sampled sprite-sheet cel draw operations.
+          M2DebugInterpolation.csv: fish simulation vs rendered offsets.
+          M2DebugObjectMotion.csv: coin/food/alien/other-pet render offsets.
+          Objects/interpolation trace every frame through frame 9,999;
+          then every third frame, keeping useful long-session coverage.
+          Per-frame timing and all warning checks remain continuous.
+          M2DebugEvents.csv: warnings on timing and draw-state changes.
+          M2DebugInvalidSprites.csv: unexpected out-of-range sprite calls.
+          M2DebugSkippedSprites.csv: non-rendered animation frames, including
+          known first-frame sentinels, trailing laser animation columns,
+          and exact terminal warp/egg animation frames.
+          M2DebugFrames.csv: expectedSkippedCels counts those known skips.
+          Newly spawned guppies now start with an initialised horizontal speed
+          in either direction, avoiding uninitialised velocity on first update.
+          Rendering now rejects unrepresentable fish interpolation coordinates;
+          the debug events file reports each affected fish once.
+          M2DebugFrames.csv now has scheduledTicks and actualTicksSincePreviousPresent
+          separately, to avoid confusing per-loop updates with completed ticks.
+          All files are created alongside the executable.
+          Verbose tracing adds CPU/disk overhead; use it during brief tests.
+
+          Double-click "Analyze M2 Logs.cmd" after closing the game to generate
+          M2DiagnosticReport.txt from M2Debug*.csv and M2Timing.log.
+          Windows Python 3 (py or python on PATH) is required for this optional
+          read-only report. A good report does NOT prove GPU/display presentation
+          or visual perfection of every animation.
+
+          The title bar displays approximate simulation/render rates (windowed).
+          The logs can identify unchanged sprite frames and unwanted
+          updates, but cannot alone prove every animation looks correct.
+
+          No original game assets are included in this ZIP.
+          '@ | Set-Content -Path 'stage/M2_README.txt' -Encoding utf8
+                    Compress-Archive -Path stage/* -DestinationPath (Join-Path 'release' $env:RELEASE_ASSET) -CompressionLevel Optimal -Force
+          $zip = Join-Path $PWD ('release/' + $env:RELEASE_ASSET)
+          $entry = [System.IO.Compression.ZipFile]::OpenRead($zip)
+          try {
+            foreach ($expected in @('InsaniquariumEnhanced.exe', 'Start M2.cmd', 'Start M2 Debug.cmd', 'M2_README.txt', 'AnalyzeM2Logs.py', 'trace_integrity.py', 'Analyze M2 Logs.cmd')) {
+              if (-not ($entry.Entries.FullName -contains $expected)) {
+                throw "Release archive is missing $expected"
+              }
+            }
+          } finally { $entry.Dispose() }
+          Get-FileHash $zip -Algorithm SHA256 | Format-List
+          "Build verified: x64 PE executable and release ZIP present" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: InsaniquariumEnhanced-M2OtherPet-Win64
+          path: release/InsaniquariumEnhanced-M2OtherPet-Win64.zip
+          if-no-files-found: error
+          retention-days: 90
+
+      
+      - name: Publish experimental ZIP for direct download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $notes = @'
+          ## M2 experimental 60 FPS — Other-Type Pet Interpolation
+
+          This is an opt-in Windows x64 test build, **not** the stable release.
+
+          ### New in this test
+          - Render-only OtherTypePet smoothing with 48px teleport and pause guards.
+          - Keep simulation AI, click positions, collisions and saves unchanged.
+          - Run OtherTypePet sound/game callback on the original 28ms tick in M2.
+          - Trace other_pet visual offsets in M2DebugObjectMotion.csv.
+          - Preserve working FishPet/Fish/Coin/Food/Alien interpolation.
+          - Add synthetic source and translation regression tests.
+          - Fix fish-type pets bypassing Fish::Update interpolation history;
+            their inherited Fish::Draw can now render smoothed positions.
+          - Move fish-type pet music/game callback back to 28ms simulation
+            ticks in M2 mode; preserve original non-M2 behaviour.
+          - Report fish vs fish-type pet actual render-offset coverage.
+          - Preserve existing fish/coin/food/alien motion and original AI/hitboxes.
+          - Check all trace CSVs for malformed/truncated rows and mixed captures.
+          - Detect 350,000-row trace caps and sample stream end-frame differences.
+          - Separate fish-type pets from guppies; report moving vs stationary pets.
+          - Report movement coverage for other pets, aliens, missiles and effects.
+          - Diagnostics only; retains verified alien/coin/food/fish interpolation.
+          - Add render-only alien movement interpolation with 48px teleport guard.
+          - Record alien offsets in M2DebugObjectMotion.csv for in-game verification.
+          - Preserve original 28ms AI, targeting, collisions and save state.
+          - Run sound callback only on simulation ticks in M2 mode.
+          - Include alien motion and pause regression tests.
+          - Adds read-only probes for OtherTypePet, Missle and Shot update/draw calls.
+          - Detects effects changing object positions or animation cells during redraws.
+          - Automatic log report lists exact non-presented frames and which object
+            categories have not appeared in a test; no gameplay changes.
+          - Adds a one-click local log analyzer, producing M2DiagnosticReport.txt.
+          - Includes standard-library-only Python regression tests and read-only CSV checks.
+          - Does not alter any gameplay/render interpolation from the Coin Homing build.
+          - Interpolates coin and food SPRITES between 28ms simulation ticks
+            during experimental 60 FPS rendering, using scoped Graphics shifts.
+          - Keeps simulation, collecting/collisions, widget hitboxes and saves untouched.
+          - Moves coin/food FishSongMgr updates onto original simulation ticks
+            during M2 mode to avoid repeated game updates per redraw.
+          - Restores translations on all draw return paths and invalidates
+            stale history when pause menus open; tests guard every case.
+          - Full object and fish-interpolation detail for the first 10,000
+            presentation frames; every third frame thereafter for longer sessions.
+          - Keeps continuous frame timing and source-level warnings at all times.
+          - Leaves independent 350,000-row CSV limits and gameplay unchanged.
+          - Disables unnecessary C++20 module scanning in the pinned game and framework
+            builds; no C++20 module sources are expected in this native port.
+          - Keeps the previous verified source and compiler caches.
+          - Does not change game code or playback/timing behaviour.
+          - Re-tests pinned source checkout restoration using the saved cache.
+          - Uses bounded CPU-aware Ninja parallelism (at most six jobs).
+          - Reuses verified pinned game/framework/dependency sources via
+            GitHub Actions cache, skipping repeated Git clones on cache hits.
+          - Cache is saved before any generated or patched game files exist.
+          - Keeps the existing MSVC/Ninja/sccache compiler object cache.
+          - Makes no game simulation, rendering or sprite behaviour changes.
+          - Classifies exact terminal warp and egg hidden frames as skipped.
+          - Preserves the original drawing and flags malformed near-misses.
+          - Uses independent object, sprite and interpolation CSV row budgets.
+          - Compiles with the MSVC x64 toolchain and Ninja instead of MSBuild.
+          - Enables GitHub Actions sccache for reuse of unchanged C/C++ objects.
+          - Retains source-level /Z7 symbols and /DEBUG linked PDB.
+          - Reports compiler cache statistics for validation.
+          - No game logic or rendering behaviour was changed by this CI update.
+          - Reclassify proven nonrendering laser tail frames and initial
+            smoke/explosion -1 cels as skipped, not erroneous draws.
+          - Keep original sprite rendering and animation durations unchanged.
+          - Leave warp and egg out-of-sheet calls visible for investigation.
+          - Initialise newly spawned guppies' positive horizontal speed to
+            +0.1; previously one random branch left mVX uninitialised.
+            The existing -0.1 negative branch and all game timing are retained.
+          - Prevent out-of-range float-to-int conversions when fish simulation
+            contains extreme or non-finite coordinates; game state is untouched.
+          - Report each affected fish once in M2DebugEvents.csv.
+          - Add render-coordinate regression tests to Windows CI.
+          - Preserve all previous sprite classification and pause fixes.
+          - Classify intentional cel -1 calls from images/merylblink and
+            images/chomp as expected hidden frames instead of warnings.
+          - Write these to M2DebugSkippedSprites.csv and expectedSkippedCels.
+          - M2DebugInvalidSprites.csv now contains unexpected invalid cels.
+          - Frame CSV separates scheduledTicks from actualTicksSincePreviousPresent.
+          - Preserves previous fixes; no additional gameplay animations changed.
+
+          ### Previously added
+          - Press Esc during gameplay to open the existing in-game Options pause menu.
+          - Press Esc again to close it without leaving the tank.
+          - Ignore held-key repeats and avoid interfering with other modal dialogs.
+          - Preserves the pause interpolation fix, verbose debugging, and 60 FPS opt-in.
+
+          ### Previously fixed
+          - Freeze fish interpolation when opening a modal dialog such as Options.
+          - Discard stale interpolation history on pause to prevent snapping when resuming.
+          - Keep the 60 Hz menu renderer and 28 ms gameplay simulation unchanged.
+          - Log tank_paused and tank_resumed markers in M2DebugEvents.csv.
+
+          ### Also included
+          - Opt-in per-frame CSV tracing, object animation indices, sprite-sheet draw cels,
+            fish interpolation offsets, and drawing/game-state mutation warnings.
+          - Removed the obsolete Hardware Acceleration checkbox and its menu label.
+          - Prevented the old Is3D flag, including previously saved preferences,
+            from resetting or destroying the SDL3 renderer.
+          - Retained fullscreen/windowed switching without a legacy 3D mode change.
+
+          ### How to test
+          1. Extract the ZIP into a separate folder.
+          2. Copy original game asset folders: data, images, music,
+             properties, sounds, fishsongs.
+          3. Run "Start M2 Debug.cmd" for experimental 60 FPS **with verbose tracing**.
+          4. Press Esc in Adventure or Virtual Tank to open Options, then press Esc to resume.
+          5. Confirm Esc does not dismiss other prompts or open Options from other screens.
+          6. Play for 30–60 seconds, trying fish, coins, food, enemies and menu animations.
+          7. Send the generated M2Debug*.csv files, especially M2DebugSkippedSprites.csv and
+             M2DebugInvalidSprites.csv, plus Events and Frames.
+          8. Run "Start M2.cmd" to compare FPS without tracing overhead.
+
+          M2 retains original ~35.7 Hz simulation timing. Fish, coin and food
+          SPRITE positions have render-only interpolation; native 4K and
+          remaining object types are not yet implemented.
+
+          CI includes scheduler and debug recorder smoke tests. Instrumentation
+          does not certify correctness of all animations by itself.
+
+          This uses a non-version experimental tag so that M1.2's in-game
+          updater doesn't offer it as a normal update.
+          '@
+          $asset = Join-Path 'release' $env:RELEASE_ASSET
+          $artifactPage = "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          # Repository policy can restrict workflow tokens despite contents: write.
+          # On explicit HTTP 403, keep the already-tested Actions ZIP available.
+          $lookup = & gh release view $env:PUBLIC_TEST_TAG --repo $env:GITHUB_REPOSITORY 2>&1
+          $lookupCode = $LASTEXITCODE
+          $lookupText = ($lookup | Out-String)
+          if ($lookupCode -ne 0 -and $lookupText -match 'HTTP 403|Resource not accessible by integration') {
+            Write-Warning 'Release publishing denied by repository workflow token permissions (HTTP 403).'
+            "Verified Windows ZIP available in Actions artifacts: $artifactPage" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+            exit 0
+          }
+          if ($lookupCode -ne 0 -and $lookupText -notmatch 'HTTP 404|release not found') {
+            throw "Could not check existing release: $lookupText"
+          }
+          if ($lookupCode -eq 0) {
+            $result = & gh release upload $env:PUBLIC_TEST_TAG $asset --clobber --repo $env:GITHUB_REPOSITORY 2>&1
+            $code = $LASTEXITCODE
+            if ($code -eq 0) {
+              $result = & gh release edit $env:PUBLIC_TEST_TAG --prerelease --notes $notes --repo $env:GITHUB_REPOSITORY 2>&1
+              $code = $LASTEXITCODE
+            }
+          } else {
+            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Other-Type Pet Interpolation (Experimental)' --notes $notes --prerelease 2>&1
+            $code = $LASTEXITCODE
+          }
+          if ($code -ne 0) {
+            $message = ($result | Out-String)
+            if ($message -match 'HTTP 403|Resource not accessible by integration') {
+              Write-Warning 'GitHub release API denied write access (HTTP 403); test ZIP remains available in Actions artifacts.'
+              "Verified Windows ZIP available in Actions artifacts: $artifactPage" | Out-File $env:GITHUB_STEP_SUMMARY -Append
+              exit 0
+            }
+            throw "Release publishing failed: $message"
+          }
+          "Direct ZIP: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:PUBLIC_TEST_TAG/$env:RELEASE_ASSET" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
+
+
