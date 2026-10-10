@@ -20,8 +20,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-render-guard-20261010
-      RELEASE_ASSET: InsaniquariumEnhanced-M2RenderGuard-Win64.zip
+      PUBLIC_TEST_TAG: m2-fish-initialization-20261010
+      RELEASE_ASSET: InsaniquariumEnhanced-M2FishInit-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -104,6 +104,13 @@ jobs:
           $ErrorActionPreference = 'Stop'
           python m2/disable_legacy_ha.py
           if ($LASTEXITCODE -ne 0) { throw 'Legacy hardware acceleration fix failed' }
+
+      - name: Initialise horizontal velocity for newly spawned fish
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python m2/fix_fish_velocity.py
+          if ($LASTEXITCODE -ne 0) { throw 'New fish velocity initialisation failed' }
 
       - name: Apply opt-in 60 FPS fixed-step experiment
         shell: pwsh
@@ -282,6 +289,8 @@ jobs:
           M2DebugSkippedSprites.csv: intentional hidden cel -1 requests
           for Meryl blink and the initial chomp frames.
           M2DebugFrames.csv: expectedSkippedCels counts those known skips.
+          Newly spawned guppies now start with an initialised horizontal speed
+          in either direction, avoiding uninitialised velocity on first update.
           Rendering now rejects unrepresentable fish interpolation coordinates;
           the debug events file reports each affected fish once.
           M2DebugFrames.csv now has scheduledTicks and actualTicksSincePreviousPresent
@@ -311,8 +320,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2RenderGuard-Win64
-          path: release/InsaniquariumEnhanced-M2RenderGuard-Win64.zip
+          name: InsaniquariumEnhanced-M2FishInit-Win64
+          path: release/InsaniquariumEnhanced-M2FishInit-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -324,11 +333,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — Safe fish interpolation
+          ## M2 experimental 60 FPS — Fish initialization and render safety
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Initialise newly spawned guppies' positive horizontal speed to
+            +0.1; previously one random branch left mVX uninitialised.
+            The existing -0.1 negative branch and all game timing are retained.
           - Prevent out-of-range float-to-int conversions when fish simulation
             contains extreme or non-finite coordinates; game state is untouched.
           - Report each affected fish once in M2DebugEvents.csv.
@@ -391,7 +403,7 @@ jobs:
             gh release edit $env:PUBLIC_TEST_TAG --prerelease --notes $notes --repo $env:GITHUB_REPOSITORY
             if ($LASTEXITCODE -ne 0) { throw 'Could not update experimental notes' }
           } else {
-            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Safe Fish Rendering (Experimental)' --notes $notes --prerelease
+            gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Fish Initialization Fix (Experimental)' --notes $notes --prerelease
             if ($LASTEXITCODE -ne 0) { throw 'Could not publish experimental release' }
           }
           "Direct ZIP: https://github.com/$env:GITHUB_REPOSITORY/releases/download/$env:PUBLIC_TEST_TAG/$env:RELEASE_ASSET" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
