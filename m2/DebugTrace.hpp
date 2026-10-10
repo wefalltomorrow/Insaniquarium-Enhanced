@@ -192,9 +192,24 @@ public:
             // Original graphics code intentionally ignores negative cels.
             // Meryl's blinking overlay and the first chomp-effect frame
             // both use -1 as a normal "do not draw" sentinel.
-            const bool expectedSkip = col == -1 && row == 0 &&
+            // The old graphics engine ignores these out-of-sheet calls:
+            // - Negative first cels are hidden startup frames for shot FX.
+            // - Laser shots have a 15-tick lifetime but only 10 drawable
+            //   animation columns; their trailing frames remain invisible.
+            // Neither case should be clamped to a visible sprite frame.
+            const bool hiddenFirstCel = col == -1 && row == 0 &&
                 (assetPath == "images/merylblink" ||
-                 assetPath == "images/chomp");
+                 assetPath == "images/chomp" ||
+                 assetPath == "images/smoketiny" ||
+                 assetPath == "images/smokesmall" ||
+                 assetPath == "images/explosion" ||
+                 assetPath == "images/explosiontiny" ||
+                 assetPath == "images/explosionsmall");
+            const bool hiddenLaserTail =
+                assetPath == "images/lasers" &&
+                maxCols == 10 && maxRows == 6 &&
+                col >= 10 && col <= 13 && row >= 0 && row < 6;
+            const bool expectedSkip = hiddenFirstCel || hiddenLaserTail;
             if (expectedSkip)
                 ++skippedSpriteCount;
             else {

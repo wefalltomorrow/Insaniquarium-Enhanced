@@ -27,6 +27,12 @@ int main() {
     diag.SpriteCel(&id, -1, 0, 12, 20, 8, 8, 256, 256, "images/test_sheet.png");
     diag.SpriteCel(&id, -1, 0, 139, 196, 3, 1, 165, 25, "images/merylblink");
     diag.SpriteCel(&id, -1, 0, 0, 0, 5, 1, 150, 30, "images/chomp");
+    diag.SpriteCel(&id, -1, 0, 0, 0, 20, 1, 300, 30, "images/smoketiny");
+    diag.SpriteCel(&id, -1, 0, 0, 0, 20, 1, 300, 30, "images/explosion");
+    diag.SpriteCel(&id, 11, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
+    diag.SpriteCel(&id, 13, 5, 0, 0, 10, 6, 800, 480, "images/lasers");
+    diag.SpriteCel(&id, 14, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
+    diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1000, 100, "images/eggcrack2");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
@@ -68,7 +74,7 @@ int main() {
                "known hidden frames must not count as invalid");
         ++unexpectedRows;
     }
-    Verify(unexpectedRows == 2, "unexpected negative and high cels both logged");
+    Verify(unexpectedRows == 4, "unclassified negative, high, laser-14 and egg row cells all logged");
     std::fclose(invalid);
 
     FILE* skipped = std::fopen("M2DebugSkippedSprites.csv", "rb");
@@ -81,8 +87,22 @@ int main() {
     Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
            std::strstr(record, "images/chomp") != nullptr,
            "Chomp intentional no-draw frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/smoketiny") != nullptr,
+           "Smoke first hidden frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/explosion") != nullptr,
+           "Explosion first hidden frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/lasers") != nullptr &&
+           std::strstr(record, ",11,0,") != nullptr,
+           "Laser first out-of-sheet tail column logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/lasers") != nullptr &&
+           std::strstr(record, ",13,5,") != nullptr,
+           "Laser tail at highest real row logged");
     Verify(std::fgets(record, sizeof(record), skipped) == nullptr,
-           "only expected hidden frames are classified");
+           "only the known nonrendering frames are classified");
     std::fclose(skipped);
 
     std::puts("PASS M2 debug timing, classified hidden frames and invalid sprite traces");
