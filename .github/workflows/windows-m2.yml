@@ -354,15 +354,29 @@ jobs:
           echo Play for 30-60 seconds and then send the M2Debug*.csv files.
           start "" "%~dp0InsaniquariumEnhanced.exe"
           '@ | Set-Content -Path 'stage/Start M2 Debug.cmd' -Encoding ascii
+          Copy-Item 'm2/analyze_logs.py' 'stage/AnalyzeM2Logs.py'
+          @'
+          @echo off
+          cd /d "%~dp0"
+          where py >nul 2>nul
+          if not errorlevel 1 (
+            py -3 AnalyzeM2Logs.py --directory . --output M2DiagnosticReport.txt
+          ) else (
+            python AnalyzeM2Logs.py --directory . --output M2DiagnosticReport.txt
+          )
+          echo.
+          echo Check M2DiagnosticReport.txt in this folder.
+          pause
+          '@ | Set-Content -Path 'stage/Analyze M2 Logs.cmd' -Encoding ascii
           @'
           INSANIQUARIUM ENHANCED M2 - EXPERIMENTAL TIMING TEST
 
           Double-click "Start M2.cmd" to enable the experimental 60 Hz
           presentation clock, while retaining 28 ms gameplay updates.
 
-          This is NOT the complete 60 FPS mod: only fish movement currently
-          has render-only positional interpolation. Other effects retain
-          their original update cadence.
+          This is NOT a complete 60 FPS conversion: fish, coin, and food
+          sprite positions have render-only interpolation. Other effects
+          retain their original simulation/animation cadence.
 
           M2 writes M2Timing.log in this folder. Please compare the
           sim= rate (~35.7 Hz) and present= rate (~60 Hz). Gameplay speed,
@@ -380,6 +394,7 @@ jobs:
           M2DebugObjects.csv: game objects' positions and animation cels.
           M2DebugSprites.csv: sampled sprite-sheet cel draw operations.
           M2DebugInterpolation.csv: fish simulation vs rendered offsets.
+          M2DebugObjectMotion.csv: coin/food render offsets, pause and visual history.
           Objects/interpolation trace every frame through frame 9,999;
           then every third frame, keeping useful long-session coverage.
           Per-frame timing and all warning checks remain continuous.
@@ -398,6 +413,12 @@ jobs:
           All files are created alongside the executable.
           Verbose tracing adds CPU/disk overhead; use it during brief tests.
 
+          Double-click "Analyze M2 Logs.cmd" after closing the game to generate
+          M2DiagnosticReport.txt from M2Debug*.csv and M2Timing.log.
+          Windows Python 3 (py or python on PATH) is required for this optional
+          read-only report. A good report does NOT prove GPU/display presentation
+          or visual perfection of every animation.
+
           The title bar displays approximate simulation/render rates (windowed).
           The logs can identify unchanged sprite frames and unwanted
           updates, but cannot alone prove every animation looks correct.
@@ -408,7 +429,7 @@ jobs:
           $zip = Join-Path $PWD ('release/' + $env:RELEASE_ASSET)
           $entry = [System.IO.Compression.ZipFile]::OpenRead($zip)
           try {
-            foreach ($expected in @('InsaniquariumEnhanced.exe', 'Start M2.cmd', 'Start M2 Debug.cmd', 'M2_README.txt')) {
+            foreach ($expected in @('InsaniquariumEnhanced.exe', 'Start M2.cmd', 'Start M2 Debug.cmd', 'M2_README.txt', 'AnalyzeM2Logs.py', 'Analyze M2 Logs.cmd')) {
               if (-not ($entry.Entries.FullName -contains $expected)) {
                 throw "Release archive is missing $expected"
               }
