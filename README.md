@@ -179,6 +179,25 @@ proof that every pet animation is smooth at 60 FPS.
 The trace analyzer still measures game-side diagnostics only; successful
 CSV checks do not establish physical monitor frame delivery.
 
+### Fish-type pet smoothing (M2 experimental)
+
+Raw **M2 Trace Audit** recordings separated 37,457 ordinary fish draws
+(26,363 with nonzero render interpolation) from 15,775 fish-type pet
+draws (**zero** with nonzero interpolation), despite 7,239 simulated
+pet movements. This is because `FishTypePet::Update` overrides
+`Fish::Update` but inherits `Fish::Draw`; prior M2 history sampling
+and its 28ms sound callback only ran in `Fish::Update`.
+
+The experimental `m2/apply_fish_pet.py` restores per-simulation-tick
+previous-position sampling and the sound callback in
+`FishTypePet::Update` for M2 only. Pause and teleport safety
+remain in the inherited draw path. It makes **no changes** to AI,
+collisions, save data, pet simulation movement, ordinary fish or M1.2.
+
+`Analyze M2 Logs.cmd` now compares actual nonzero visual offsets
+for ordinary fish and fish-type pets by their respective object IDs,
+so an in-game recording can confirm or refute the effect.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
