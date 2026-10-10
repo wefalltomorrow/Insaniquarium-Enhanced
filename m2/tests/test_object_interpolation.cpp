@@ -93,7 +93,7 @@ int main() {
         // An uninterrupted graphics shift must not change any hitbox coords.
         ScopedObjectTranslation<GraphicsProbe> otherPet(
             &g, true, false, prev, 140.0, 300.0,
-            141.0, 302.0, 141, 302, .25);
+            141.0, 302.0, 141, 302, .20);
         Verify(otherPet.ShiftY() == -2,
                "other-pet render-only interpolation of small movements");
         Verify(g.y == -2, "other-pet translation applied only to Graphics");
@@ -102,7 +102,7 @@ int main() {
     {
         ScopedObjectTranslation<GraphicsProbe> petPaused(
             &g, true, true, prev, 140.0, 300.0,
-            141.0, 302.0, 141, 302, .25);
+            141.0, 302.0, 141, 302, .20);
         Verify(petPaused.ShiftX() == 0 && petPaused.ShiftY() == 0 && !prev,
                "other-pet pause invalidates visual history");
     }
