@@ -49,6 +49,9 @@ int main() {
     diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack1");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
     diag.RenderOffset(&id, 12, 20, 1, 0, 0.3);
+    diag.ObjectMotion(M2Debug::Coin, &id, 120, 50, -1, 0, 0.3, false, true);
+    diag.ObjectMotion(M2Debug::Food, &id, 123, 44, 0, -1, 0.5, false, true);
+    diag.ObjectMotion(M2Debug::Food, &id, 123, 44, 0, 0, 0.5, true, false);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
@@ -74,6 +77,23 @@ int main() {
     Verify(interp != nullptr, "interpolation output exists");
     std::fclose(interp);
 
+    char motionLine[512] = {};
+    FILE* motion = std::fopen("M2DebugObjectMotion.csv", "rb");
+    Verify(motion != nullptr, "coin/food motion output exists");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) != nullptr &&
+           std::strstr(motionLine, "kind,objectId") != nullptr, "motion CSV schema");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) != nullptr &&
+           std::strstr(motionLine, ",coin,") != nullptr &&
+           std::strstr(motionLine, ",-1,0,") != nullptr, "coin interpolation logged");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) != nullptr &&
+           std::strstr(motionLine, ",food,") != nullptr &&
+           std::strstr(motionLine, ",0,-1,") != nullptr, "food interpolation logged");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) != nullptr &&
+           std::strstr(motionLine, ",food,") != nullptr &&
+           std::strstr(motionLine, ",1,0") != nullptr, "paused food with reset history");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) == nullptr,
+           "only tracked coin/food motions emitted");
+    std::fclose(motion);
     FILE* invalid = std::fopen("M2DebugInvalidSprites.csv", "rb");
     Verify(invalid != nullptr, "invalid sprite details file exists");
     char record[512] = {};
