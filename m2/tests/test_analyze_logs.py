@@ -22,9 +22,9 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
 
     def normal(self):
         self.csv("M2DebugFrames.csv",
-                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,drawsFish,drawsCoin,drawsFood,drawsAlien,drawsOtherPet,drawsMissile,drawsShotEffect",
-                 [[0, 1, 1, 0, 0, 10.4, 1, 1, 1, 1, 1, 1, 1],
-                  [1, 1, 1, 0, 0, 13.1, 1, 1, 1, 1, 1, 1, 1]])
+                 "frame,totalSimTicks,presented,invalidCels,warnings,renderMs,drawsFish,drawsCoin,drawsFood,drawsAlien,drawsOtherPet,drawsMissile,drawsShotEffect,drawsFishPet",
+                 [[0, 1, 1, 0, 0, 10.4, 1, 1, 1, 1, 1, 1, 1, 1],
+                  [1, 1, 1, 0, 0, 13.1, 1, 1, 1, 1, 1, 1, 1, 1]])
         self.csv("M2DebugEvents.csv", "frame,gameTick,severity,event",
                  [[0, 0, "INFO", "debug_enabled"],
                   [0, 1, "INFO", "tank_paused"],
