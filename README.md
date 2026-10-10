@@ -107,6 +107,8 @@ simulation ticks, not repeated presentation calls. The patch is opt-in and
 does not change the M1.2 stable release. Windows CI has source-anchor checks
 and tests for pause, teleport and invalid-position safety.
 
+The M2 debug launcher also writes `M2DebugObjectMotion.csv` with coin/food simulation positions, render shifts, frame blend, pause status and visual-history state. It is independent of the fish-only `M2DebugInterpolation.csv` and uses the same long-session sampling policy.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
