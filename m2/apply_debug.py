@@ -123,6 +123,17 @@ def main() -> None:
                x + ", " + y + ", " + cel + ");",
                "observe " + name + " rendering without changing gameplay")
 
+    # Missile position tracing only. Do NOT interpolate missiles until real
+    # movement paths/teleports are characterised from an uncapped session.
+    missle = GAME / "Missle.cpp"
+    missile_draw_probe = ("M2Debug::DrawGuard m2Probe("
+                          "M2Debug::Missile, this, mXD, mYD, m0x178);")
+    change(missle, missile_draw_probe,
+           missile_draw_probe +
+           "\n\tM2Debug::Get().ObjectMotion(M2Debug::Missile, this, mXD, mYD, "
+           "0, 0, 0.0, mApp->mBoard && mApp->mBoard->mPause, false);",
+           "trace missile simulation position without interpolation")
+
     # Fish-type pets inherit Fish::Draw but have their own Update().
     # Count their simulation ticks independently from ordinary guppies.
     fish_pet = GAME / "FishTypePet.cpp"
