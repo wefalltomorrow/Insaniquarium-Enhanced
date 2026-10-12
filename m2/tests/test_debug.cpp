@@ -80,6 +80,7 @@ int main() {
     diag.ObjectMotion(M2Debug::Food, &id, 123, 44, 0, 0, 0.5, true, false);
     diag.ObjectMotion(M2Debug::Alien, &id, 201.5, 291.5, -3, -1, 0.5, false, true);
     diag.ObjectMotion(M2Debug::OtherPet, &id, 120, 310, -1, 0, 0.5, false, true);
+    diag.ObjectMotion(M2Debug::Missile, &id, 300, 310, 0, 0, 0.0, false, false);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
@@ -137,8 +138,12 @@ int main() {
            std::strstr(motionLine, ",other_pet,") != nullptr &&
            std::strstr(motionLine, ",-1,0,") != nullptr,
            "other-pet render-only visual shift logged");
+    Verify(std::fgets(motionLine, sizeof(motionLine), motion) != nullptr &&
+           std::strstr(motionLine, ",missile,") != nullptr &&
+           std::strstr(motionLine, ",0,0,") != nullptr,
+           "missile unmodified simulation coordinates logged");
     Verify(std::fgets(motionLine, sizeof(motionLine), motion) == nullptr,
-           "only tracked coin/food/alien/pet motions emitted");
+           "only tracked coin/food/alien/pet/missile motions emitted");
     std::fclose(motion);
     FILE* invalid = std::fopen("M2DebugInvalidSprites.csv", "rb");
     Verify(invalid != nullptr, "invalid sprite details file exists");
