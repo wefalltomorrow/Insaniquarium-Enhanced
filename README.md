@@ -47,9 +47,9 @@ Windows x64 release.
 
 ## Experimental M2 — independent 60 FPS presentation
 
-[M2 is being tested in draft PR #5](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/pull/5), **not merged into `main`**. M1.2 remains the baseline build. The most recently **completed and published** M2 test is [Sprite Sentinels](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases/tag/m2-sprite-sentinels-20261010). Newer M2 Fish Initialization and Render Guard changes are undergoing Windows compilation; do not treat a queued or running Actions job as a downloadable release.
+[M2 remains experimental in draft PR #5](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/pull/5), **not merged into `main`**. M1.2 remains the stable baseline. See the [M2 pre-release builds](https://github.com/wefalltomorrow/Insaniquarium-Enhanced/releases) for the most recent verified download; only completed Windows CI runs with an attached ZIP count as published. The optional M2 branch now includes fish, fish-type pet, coin, food, alien and other-type pet draw-only interpolation, long-session diagnostics and source-validated shot constructor initialisation. This does **not** establish full animation smoothness or native 4K.
 
-The experimental M2 scheduler preserves **one gameplay update every 28 ms (~35.7 Hz)** while targeting **60 rendered frames per second**. Fish movement receives render-only positional interpolation. Other animations and moving object classes have *not* been fully interpolated, and the game still presents a **640×480 logical framebuffer** rather than native 4K. Native-resolution rendering and antialiasing remain future work.
+The experimental M2 scheduler preserves **one gameplay update every 28 ms (~35.7 Hz)** while targeting **60 rendered frames per second**. Fish, fish-type pets, coins, food, aliens and other-type pets receive draw-only positional interpolation, independently verified in recorded gameplay. Missiles and several effect animations remain unsmoothed, and the game still presents a **640×480 logical framebuffer**, not native 4K. Native-resolution rendering and antialiasing remain future work.
 
 ### Running the M2 test
 
