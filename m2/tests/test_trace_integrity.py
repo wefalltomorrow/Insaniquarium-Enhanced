@@ -7,7 +7,7 @@ from unittest.mock import patch
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from trace_integrity import inspect_trace, audit_traces, audit_object_movement, audit_fish_interpolation
+from trace_integrity import inspect_trace, audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion
 from analyze_logs import analyze
 
 
@@ -87,6 +87,32 @@ class TraceIntegrityTests(unittest.TestCase):
         lines, findings = audit_fish_interpolation(self.folder)
         self.assertTrue(any("fish_pet: 2 traced draws, 1 nonzero offsets (50.0%)" in x for x in lines))
         self.assertFalse(any("Fish-type pets were drawn but none" in x for x in findings))
+
+    def test_missile_movement_and_guard_analysis(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "renderX", "renderY", "offsetX", "offsetY"],
+            [[0, 1, "missile", 8, 100, 100, 100, 100, 0, 0],
+             [1, 1, "missile", 8, 100, 100, 100, 100, 0, 0],
+             [2, 2, "missile", 8, 102, 103, 102, 103, 0, 0],
+             [3, 3, "missile", 8, 155, 103, 155, 103, 0, 0],
+             [4, 3, "food", 10, 3, 4, 3, 4, 0, 0]])
+        detail, warnings = audit_missile_motion(self.folder)
+        self.assertIn("missile: 4 draws, 1 object IDs, 2 adjacent-tick movements", detail[0])
+        self.assertIn("largest consecutive step X/Y 53.00/3.00px", detail[0])
+        self.assertIn("1 guard-sized jumps", detail[0])
+        self.assertTrue(any("teleports/rapid movement" in x for x in warnings))
+
+    def test_no_missile_samples_not_a_false_pass(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "offsetX", "offsetY"],
+            [[0, 1, "food", 8, 100, 100, 0, 0]])
+        details, notes = audit_missile_motion(self.folder)
+        self.assertEqual(details, [])
+        self.assertTrue(any("not captured" in x for x in notes))
 
     def test_report_integration(self):
         self.write_csv("M2DebugFrames.csv",
