@@ -23,7 +23,18 @@ int main() {
     Verify(!M2Debug::Recorder::SampleDetailFrame(10000), "late unsampled frame");
     Verify(!M2Debug::Recorder::SampleDetailFrame(10001), "late adjacent frame");
     Verify(M2Debug::Recorder::SampleDetailFrame(10002), "late sampled frame");
-    Verify(M2Debug::Recorder::SampleDetailFrame(30000), "long session still sampled");
+    Verify(M2Debug::Recorder::SampleDetailFrame(30000), "30k transition sampled");
+    Verify(!M2Debug::Recorder::SampleDetailFrame(30001), "30k tier sparse");
+    Verify(M2Debug::Recorder::SampleDetailFrame(60000), "60k transition sampled");
+    Verify(!M2Debug::Recorder::SampleDetailFrame(60001), "60k tier sparse");
+    Verify(M2Debug::Recorder::SampleDetailFrame(117168), "33-minute trace retains late frames");
+    Verify(M2Debug::Recorder::SampleSpriteFrame(0), "startup sprites sampled");
+    Verify(!M2Debug::Recorder::SampleSpriteFrame(1), "startup sprite cadence");
+    Verify(M2Debug::Recorder::SampleSpriteFrame(10000), "10k sprite-tier sampled");
+    Verify(!M2Debug::Recorder::SampleSpriteFrame(10002), "10k sprite-tier thinned");
+    Verify(M2Debug::Recorder::SampleSpriteFrame(30000), "30k sprite-tier sampled");
+    Verify(M2Debug::Recorder::SampleSpriteFrame(60000), "60k sprite-tier sampled");
+    Verify(!M2Debug::Recorder::SampleSpriteFrame(60001), "60k sprite-tier sparse");
     auto& diag = M2Debug::Get();
     Verify(diag.Active(), "debug opt-in");
     diag.Begin(16.67, 0.3, 1);
@@ -37,6 +48,7 @@ int main() {
     diag.SpriteCel(&id, -1, 0, 0, 0, 5, 1, 150, 30, "images/chomp");
     diag.SpriteCel(&id, -1, 0, 0, 0, 20, 1, 300, 30, "images/smoketiny");
     diag.SpriteCel(&id, -1, 0, 0, 0, 20, 1, 300, 30, "images/explosion");
+    diag.SpriteCel(&id, -1, 0, 0, 0, 20, 1, 800, 40, "images/smokemissile");
     diag.SpriteCel(&id, 11, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
     diag.SpriteCel(&id, 13, 5, 0, 0, 10, 6, 800, 480, "images/lasers");
     diag.SpriteCel(&id, 14, 0, 0, 0, 10, 6, 800, 480, "images/lasers");
@@ -48,6 +60,8 @@ int main() {
     diag.SpriteCel(&id, 1, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack2");
     diag.SpriteCel(&id, 0, 1, 0, 0, 10, 1, 1180, 145, "images/eggcrack1");
     diag.SpriteCel(&id, 8, 0, 0, 0, 8, 1, 240, 30, "images/unknown.png");
+    diag.SpriteCel(&id, -1, 0, 0, 0, 19, 1, 800, 40, "images/smokemissile");
+    diag.SpriteCel(&id, -2, 0, 0, 0, 20, 1, 800, 40, "images/smokemissile");
     diag.Updated(M2Debug::OtherPet);
     diag.Updated(M2Debug::FishPet);
     diag.Updated(M2Debug::Missile);
@@ -143,7 +157,7 @@ int main() {
                "known hidden frames must not count as invalid");
         ++unexpectedRows;
     }
-    Verify(unexpectedRows == 7, "seven invalid cells remain, including boundary near misses");
+    Verify(unexpectedRows == 9, "nine invalid cells remain, including missile smoke boundary near misses");
     Verify(rejectedWarp && rejectedEgg, "unknown warp and egg requests remain invalid");
     std::fclose(invalid);
 
@@ -163,6 +177,10 @@ int main() {
     Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
            std::strstr(record, "images/explosion") != nullptr,
            "Explosion first hidden frame logged");
+    Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
+           std::strstr(record, "images/smokemissile") != nullptr &&
+           std::strstr(record, ",-1,0,") != nullptr,
+           "Missile smoke first hidden cel is an expected skip");
     Verify(std::fgets(record, sizeof(record), skipped) != nullptr &&
            std::strstr(record, "images/lasers") != nullptr &&
            std::strstr(record, ",11,0,") != nullptr,
