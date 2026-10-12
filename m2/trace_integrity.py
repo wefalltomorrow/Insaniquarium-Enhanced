@@ -194,3 +194,63 @@ def audit_fish_interpolation(folder: Path):
         notes.append("INFO: {} fish/fish-pet object IDs overlap; excluded from interpolation "
                      "coverage to avoid misclassification.".format(len(overlap)))
     return lines, notes
+
+
+def audit_missile_motion(folder: Path):
+    """Summarise read-only missile coordinates from the sampled motion stream.
+
+    The current experimental build does not interpolate missile sprites; all
+    missile offsets are zero by design. This report measures simulation jumps
+    to decide whether a guarded visual shift would be safe in a future build.
+    """
+    path = folder / "M2DebugObjectMotion.csv"
+    if not path.is_file():
+        return [], []
+    prev = {}
+    ids = set()
+    samples = moved = repeats = jumps = 0
+    max_x = max_y = 0.0
+    warning = []
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            for row in csv.DictReader(source):
+                if row.get("kind") != "missile":
+                    continue
+                samples += 1
+                key = row.get("objectId")
+                if not key:
+                    continue
+                ids.add(key)
+                try:
+                    tick = int(row["gameTick"])
+                    x, y = float(row["simulationX"]), float(row["simulationY"])
+                    dx, dy = float(row["offsetX"]), float(row["offsetY"])
+                except (ValueError, TypeError, KeyError):
+                    continue
+                if dx or dy:
+                    warning.append("WARN: Missile position trace contains a nonzero render offset.")
+                if key in prev:
+                    old_tick, old_x, old_y = prev[key]
+                    if tick == old_tick:
+                        repeats += 1
+                        if abs(x-old_x) > .005 or abs(y-old_y) > .005:
+                            warning.append("WARN: Missile position changed without a simulation tick.")
+                    elif tick == old_tick + 1:
+                        step_x, step_y = abs(x-old_x), abs(y-old_y)
+                        if step_x > .005 or step_y > .005:
+                            moved += 1
+                        max_x, max_y = max(max_x, step_x), max(max_y, step_y)
+                        if step_x >= 48 or step_y >= 48:
+                            jumps += 1
+                prev[key] = tick, x, y
+    except (OSError, csv.Error) as exc:
+        return [], ["WARN: Missile motion audit could not read CSV: {}.".format(exc)]
+    if not samples:
+        return [], ["INFO: Missile movement not captured in the sampled motion stream."]
+    result = ["missile: {:,} draws, {} object IDs, {:,} adjacent-tick movements; "
+              "largest consecutive step X/Y {:.2f}/{:.2f}px; {} guard-sized jumps; "
+              "{:,} same-tick repeat draws".format(
+                 samples, len(ids), moved, max_x, max_y, jumps, repeats)]
+    if jumps:
+        warning.append("INFO: Missile teleports/rapid movement need investigation before adding interpolation.")
+    return result, list(dict.fromkeys(warning))
