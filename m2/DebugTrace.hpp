@@ -90,12 +90,20 @@ public:
         if (events) std::fclose(events);
     }
     bool Active() const { return active; }
-    // Full object/interpolation detail for the first ~167 seconds at 60 FPS.
-    // Later, sample every third presentation frame so the 350k-row
-    // per-stream budgets cover longer sessions without growing huge logs.
-    // Warning detection and per-frame totals ALWAYS run at full cadence.
+    // Keep initial gameplay detail dense; progressively thin long recordings.
+    // Real sessions exceeded four 350k-row caps by frame 117k (~33 minutes).
+    // Warnings, frame timings and per-frame totals always remain continuous.
     static bool SampleDetailFrame(unsigned long long presentFrame) {
-        return presentFrame < 10000ULL || (presentFrame % 3ULL) == 0ULL;
+        if (presentFrame < 10000ULL) return true;
+        if (presentFrame < 30000ULL) return (presentFrame % 6ULL) == 0ULL;
+        if (presentFrame < 60000ULL) return (presentFrame % 16ULL) == 0ULL;
+        return (presentFrame % 48ULL) == 0ULL;
+    }
+    static bool SampleSpriteFrame(unsigned long long presentFrame) {
+        if (presentFrame < 10000ULL) return (presentFrame % 2ULL) == 0ULL;
+        if (presentFrame < 30000ULL) return (presentFrame % 8ULL) == 0ULL;
+        if (presentFrame < 60000ULL) return (presentFrame % 24ULL) == 0ULL;
+        return (presentFrame % 48ULL) == 0ULL;
     }
     void Start() {
         if (!active || opened) return;
@@ -233,6 +241,11 @@ public:
                  assetPath == "images/explosion" ||
                  assetPath == "images/explosiontiny" ||
                  assetPath == "images/explosionsmall");
+            // Shot type 8 begins at frame -1 after m0x15c = m0x158 / 2 - 1.
+            // Its 20x1 smokemissile sheet intentionally has no sprite then.
+            const bool hiddenMissileSmokeStart = col == -1 && row == 0 &&
+                assetPath == "images/smokemissile" &&
+                maxCols == 20 && maxRows == 1;
             const bool hiddenLaserTail =
                 assetPath == "images/lasers" &&
                 maxCols == 10 && maxRows == 6 &&
@@ -246,8 +259,8 @@ public:
                 (assetPath == "images/warphole" || assetPath == "images/warpglow");
             const bool hiddenEggFinal = col == 0 && row == 1 &&
                 maxCols == 10 && maxRows == 1 && assetPath == "images/eggcrack2";
-            const bool expectedSkip = hiddenFirstCel || hiddenLaserTail ||
-                                      hiddenWarpFinal || hiddenEggFinal;
+            const bool expectedSkip = hiddenFirstCel || hiddenMissileSmokeStart ||
+                                      hiddenLaserTail || hiddenWarpFinal || hiddenEggFinal;
             if (expectedSkip)
                 ++skippedSpriteCount;
             else {
@@ -272,7 +285,7 @@ public:
             }
         }
         if (sprites && spriteRows < kTraceRowLimit &&
-            perFrameSprites++ < kSpritesPerFrame && (frame % 2) == 0) {
+            perFrameSprites++ < kSpritesPerFrame && SampleSpriteFrame(frame)) {
             std::fprintf(sprites, "%llu,%llu,%llu,%d,%d,%d,%d\n",
                          frame, ticks,
                          static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(image)),
