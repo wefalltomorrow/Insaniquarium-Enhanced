@@ -39,6 +39,7 @@ jobs:
           arch: x64
 
       - name: Set up reusable C++ compilation cache
+        continue-on-error: true # upstream GitHub release CDN can transiently return HTTP 504
         uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Check compiler tools
@@ -50,8 +51,12 @@ jobs:
           python --version
           ninja --version
           if ($LASTEXITCODE -ne 0) { throw 'Ninja missing' }
-          & $env:SCCACHE_PATH --version
-          if ($LASTEXITCODE -ne 0) { throw 'sccache missing' }
+          if ($env:SCCACHE_PATH -and (Test-Path -LiteralPath $env:SCCACHE_PATH)) {
+            & $env:SCCACHE_PATH --version
+            if ($LASTEXITCODE -ne 0) { throw 'sccache installation is damaged' }
+          } else {
+            Write-Warning 'sccache unavailable; compiling directly with MSVC + Ninja'
+          }
           if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash is required' }
 
       # Cache the exact, immutable pinned source checkouts BEFORE the
@@ -285,14 +290,23 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          cmake -S upstream/port -B upstream/port/build -G Ninja -DCMAKE_BUILD_TYPE=Release "-DCMAKE_C_COMPILER_LAUNCHER=$env:SCCACHE_PATH" "-DCMAKE_CXX_COMPILER_LAUNCHER=$env:SCCACHE_PATH" -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
+          $cacheArgs = @()
+          if ($env:SCCACHE_PATH -and (Test-Path -LiteralPath $env:SCCACHE_PATH)) {
+            $cacheArgs = @("-DCMAKE_C_COMPILER_LAUNCHER=$env:SCCACHE_PATH",
+                           "-DCMAKE_CXX_COMPILER_LAUNCHER=$env:SCCACHE_PATH")
+          } else {
+            Write-Warning 'Configuring direct compiler invocation (no sccache launcher)'
+          }
+          cmake -S upstream/port -B upstream/port/build -G Ninja -DCMAKE_BUILD_TYPE=Release @cacheArgs -DCMAKE_MSVC_DEBUG_INFORMATION_FORMAT=Embedded -DCMAKE_POLICY_DEFAULT_CMP0141=NEW -DCMAKE_CXX_SCAN_FOR_MODULES=OFF -DPOPLIB_WITH_OPENMPT=ON -DPOPLIB_WITH_BASS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_TOOLS=OFF -DFEATURE_DISCORD_RPC=OFF
           if ($LASTEXITCODE -ne 0) { throw 'CMake configuration failed' }
 
       - name: Compile Windows x64 executable
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          & $env:SCCACHE_PATH --zero-stats
+          if ($env:SCCACHE_PATH -and (Test-Path -LiteralPath $env:SCCACHE_PATH)) {
+            & $env:SCCACHE_PATH --zero-stats
+          }
           # Use extra concurrency for mostly cached object fetches,
           # without oversubscribing low-core Windows hosted runners.
           $cores = [Environment]::ProcessorCount
