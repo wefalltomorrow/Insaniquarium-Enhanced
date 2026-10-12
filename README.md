@@ -241,6 +241,29 @@ missile movement and large jumps. **Missile interpolation is not yet
 enabled**: its tracking and target-chasing logic require real movement
 evidence before applying the 48px smoothing guard.
 
+### Audited Shot constructor fix (M2 experimental, October 12, 2026)
+
+[undecuple's Insaniquarium Remastered Mod](https://github.com/undecuple/insaniquarium-remastered)
+identified an original 32-bit retail game bug in `Shot(x,y,kind)`:
+its implementation reads the shot-kind field before initialising it.
+Cross-checking our pinned `Vindirect/WinFish` source confirmed the same
+sequence in the three-argument Shot constructor. The pinned SaMeiers
+port fixups do not currently repair it.
+
+Experimental `m2/fix_shot_constructor.py` assigns `mShotType = theType`
+**before** the original conditional animation-delay calculation.
+This removes the undefined read, retains the original random-number
+call for types other than 0 and 2, and leaves all unrelated Shot
+constructors, rendering, particle lifetimes and simulation scheduling
+unchanged. The transform refuses to run if the source signature has
+changed or if it has already been applied. Regression tests cover
+source-guard refusal, exact assignment order, and branch preservation.
+
+This deliberately changes initial visual delays that previously depended
+on uninitialised memory; **in-game effect timing and sound need retesting**.
+It does not create 60 FPS animation for shot effects, enable missile
+position interpolation, improve internal resolution, or modify stable M1.2.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
