@@ -219,6 +219,28 @@ until gameplay logs show nonzero `other_pet` offsets while moving.
 The normal/non-M2 path, AI, hitboxes, collisions, clicks and saves
 are not changed. Missiles and shot-effect animation remain unmodified.
 
+### Extended M2 diagnostics (October 12, 2026)
+
+A ~32.5-minute M2 OtherPet recording retained stable ~35.717 Hz simulation
+and ~59.988 FPS game-side presentation. It exposed 583 false positive
+"invalid" sprite calls: every one was the `images/smokemissile` 20-by-1
+sprite sheet with column -1, row 0. The original `Shot::Update` creates
+that intentionally hidden first frame. The updated classifier treats
+**only this exact image, cel and sheet shape** as an expected skip. All
+other invalid sprite requests remain reportable.
+
+To keep useful object, motion, interpolation and sprite samples for longer
+sessions, debug capture now uses progressively sparser sampling after
+frames 10,000, 30,000 and 60,000. The existing **350,000-row per-file
+limit remains in force** and can still be hit in sufficiently dense sessions.
+Frame timing and warning checking continue every frame.
+
+Missile gameplay position samples now enter `M2DebugObjectMotion.csv`
+with zero visual offsets; the analyzer reports observed tick-by-tick
+missile movement and large jumps. **Missile interpolation is not yet
+enabled**: its tracking and target-chasing logic require real movement
+evidence before applying the 48px smoothing guard.
+
 ## Development
 
 - [M1 Windows build workflow](.github/workflows/windows-m1.yml): Windows Server 2022, Visual Studio 2022, CMake x64, SDL3, libopenmpt
