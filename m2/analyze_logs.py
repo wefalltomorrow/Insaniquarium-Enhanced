@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 import re
 import statistics
-from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation
+from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion
 
 def rows(folder: Path, filename: str):
     path = folder / filename
@@ -141,7 +141,7 @@ def analyze(folder: Path):
             "{}={}".format(k, v) for k, v in skipped.most_common(8)))
 
     for filename, label in (("M2DebugInterpolation.csv", "fish"),
-                            ("M2DebugObjectMotion.csv", "coin/food")):
+                            ("M2DebugObjectMotion.csv", "coin/food/alien/pet/missile")):
         counts = collections.Counter()
         moving = collections.Counter()
         max_offsets = collections.defaultdict(lambda: [0.0, 0.0])
@@ -192,6 +192,12 @@ def analyze(folder: Path):
         report.append("Fish vs fish-type pet interpolation (actual render offsets):")
         report.extend("- " + entry for entry in fish_detail)
     notes.extend(fish_notes)
+    missile_detail, missile_notes = audit_missile_motion(folder)
+    if missile_detail:
+        report.append("")
+        report.append("Missile simulation motion (not yet interpolated):")
+        report.extend("- " + entry for entry in missile_detail)
+    notes.extend(missile_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
     report.append("presentation, visual smoothness, audio fidelity and all gameplay modes")
     report.append("require separate observation/testing.")
