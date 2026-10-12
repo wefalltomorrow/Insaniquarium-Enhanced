@@ -31,10 +31,11 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
                   [1, 1, "INFO", "tank_resumed"]])
         self.csv("M2DebugInvalidSprites.csv", "frame,assetPath", [])
         self.csv("M2DebugObjectMotion.csv",
-                 "frame,gameTick,kind,objectId,offsetX,offsetY,paused",
-                 [[0, 1, "coin", 100, -1, 0, 0],
-                  [0, 1, "food", 200, 0, -1, 0],
-                  [1, 1, "coin", 100, 0, 0, 1]])
+                 "frame,gameTick,kind,objectId,simulationX,simulationY,offsetX,offsetY,paused",
+                 [[0, 1, "coin", 100, 15, 20, -1, 0, 0],
+                  [0, 1, "food", 200, 15, 20, 0, -1, 0],
+                  [1, 1, "coin", 100, 15, 20, 0, 0, 1],
+                  [1, 1, "missile", 400, 100, 150, 0, 0, 0]])
         self.csv("M2DebugInterpolation.csv",
                  "frame,gameTick,objectId,offsetX,offsetY",
                  [[0, 1, 300, 1, 0]])
