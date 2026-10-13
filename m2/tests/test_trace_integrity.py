@@ -143,6 +143,50 @@ class TraceIntegrityTests(unittest.TestCase):
         self.assertIn("Shot-effect simulation motion", report)
         self.assertFalse(errors)  # Data quality is a warning, not a fatal error.
 
+    def test_smoke_smoothing_offsets_and_reset_history_jumps(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "renderX", "renderY", "offsetX", "offsetY",
+             "blend", "paused", "hasHistory"],
+            [[0, 20, "shot_effect", 801, 15, 200, 15, 200, 0, 0, 0.1, 0, 1],
+             [1, 21, "shot_effect", 801, 15, 198, 15, 199, 0, 1, 0.5, 0, 1],
+             [2, 21, "shot_effect", 801, 15, 198, 15, 199, 0, 1, 0.5, 0, 1],
+             # Previous object died; freshly constructed effect reuses the address.
+             [3, 22, "shot_effect", 801, 450, 300, 450, 300, 0, 0, 0.1, 0, 0]])
+        details, notes = audit_shot_effect_motion(self.folder)
+        self.assertIn("4 sampled draws", details[0])
+        self.assertIn("2 visual shifts", details[0])
+        self.assertIn("1 guard-sized jumps", details[0])
+        self.assertTrue(any("reset visual history" in n for n in notes))
+        self.assertFalse(any("though interpolation is disabled" in n for n in notes))
+        self.assertFalse(any(n.startswith("WARN:") for n in notes))
+
+    def test_interpolated_missile_is_not_reported_as_an_error(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "renderX", "renderY", "offsetX", "offsetY",
+             "blend", "paused", "hasHistory"],
+            [[0, 1, "missile", 901, 100, 200, 100, 200, 0, 0, .1, 0, 1],
+             [1, 2, "missile", 901, 102.5, 201.25, 101.5, 201.25, -1, 0, .5, 0, 1],
+             [2, 2, "missile", 901, 102.5, 201.25, 101.5, 201.25, -1, 0, .5, 0, 1]])
+        details, notes = audit_missile_motion(self.folder)
+        self.assertIn("3 draws", details[0])
+        self.assertIn("2 interpolated draws", details[0])
+        self.assertIn("largest consecutive step X/Y 2.50/1.25px", details[0])
+        self.assertFalse(any(n.startswith("WARN:") for n in notes))
+
+    def test_paused_or_uninitialised_missile_history_rejected(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "offsetX", "offsetY", "paused", "hasHistory"],
+            [[0, 1, "missile", 900, 100, 200, 1, 0, 1, 0]])
+        _details, notes = audit_missile_motion(self.folder)
+        self.assertTrue(any("exceeded guard limits or occurred paused/without history"
+                            in n for n in notes))
+
     def test_older_shot_trace_not_claimed_as_verified(self):
         self.write_csv("M2DebugObjectMotion.csv",
                        ["frame", "gameTick", "kind", "objectId", "simulationX",
