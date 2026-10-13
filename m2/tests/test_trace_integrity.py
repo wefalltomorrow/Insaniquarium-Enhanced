@@ -7,7 +7,7 @@ from unittest.mock import patch
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from trace_integrity import inspect_trace, audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion
+from trace_integrity import inspect_trace, audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion, audit_shot_effect_motion
 from analyze_logs import analyze
 
 
@@ -113,6 +113,44 @@ class TraceIntegrityTests(unittest.TestCase):
         details, notes = audit_missile_motion(self.folder)
         self.assertEqual(details, [])
         self.assertTrue(any("not captured" in x for x in notes))
+
+
+    def test_shot_effect_motion_and_sampling_gaps(self):
+        self.write_csv(
+            "M2DebugObjectMotion.csv",
+            ["frame", "gameTick", "kind", "objectId", "simulationX",
+             "simulationY", "renderX", "renderY", "offsetX", "offsetY"],
+            [[0, 1, "shot_effect", 8, 10, 20, 10, 20, 0, 0],
+             [1, 1, "shot_effect", 8, 10, 20, 10, 20, 0, 0],
+             [2, 2, "shot_effect", 8, 12, 20, 12, 20, 0, 0],
+             [3, 4, "shot_effect", 8, 40, 20, 40, 20, 0, 0],
+             [4, 4, "shot_effect", 8, 41, 20, 41, 20, 0, 0],
+             [5, 5, "shot_effect", 8, 100, 20, 100, 20, 0, 0],
+             [6, 5, "coin", 19, 4, 5, 4, 5, 0, 0]])
+        detail, notes = audit_shot_effect_motion(self.folder)
+        self.assertIn("shot_effect: 6 sampled draws, 1 object IDs, "
+                      "2 adjacent-tick pairs (2 moving)", detail[0])
+        self.assertIn("1 guard-sized jumps", detail[0])
+        self.assertIn("2 same-tick redraws", detail[0])
+        self.assertIn("1 unsampled tick gaps", detail[0])
+        self.assertTrue(any("simulation coordinates changed" in n for n in notes))
+        self.assertTrue(any("trace skips 1 tick" in n for n in notes))
+        self.assertFalse(any("nonzero visual offset" in n for n in notes))
+        report_folder = self.folder
+        self.write_csv("M2DebugFrames.csv", ["frame", "totalSimTicks", "presented"],
+                       [[i, i+1, 1] for i in range(6)])
+        report, errors = analyze(report_folder)
+        self.assertIn("Shot-effect simulation motion", report)
+        self.assertFalse(errors)  # Data quality is a warning, not a fatal error.
+
+    def test_older_shot_trace_not_claimed_as_verified(self):
+        self.write_csv("M2DebugObjectMotion.csv",
+                       ["frame", "gameTick", "kind", "objectId", "simulationX",
+                        "simulationY", "offsetX", "offsetY"],
+                       [[0, 1, "missile", 3, 50, 60, 0, 0]])
+        details, notes = audit_shot_effect_motion(self.folder)
+        self.assertFalse(details)
+        self.assertTrue(any("older M2 builds" in n for n in notes))
 
     def test_report_integration(self):
         self.write_csv("M2DebugFrames.csv",
