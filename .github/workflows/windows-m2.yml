@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-effect-motion-20261013
-      RELEASE_ASSET: InsaniquariumEnhanced-M2EffectMotion-Win64.zip
+      PUBLIC_TEST_TAG: m2-effect-fulltrace-20261013
+      RELEASE_ASSET: InsaniquariumEnhanced-M2EffectFullTrace-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -453,7 +453,9 @@ jobs:
           M2DebugInterpolation.csv: fish simulation vs rendered offsets.
           M2DebugObjectMotion.csv: coin/food/alien/other-pet render offsets
           plus un-interpolated missile and shot-effect simulation positions.
-          Object/motion/interpolation trace every frame through 9,999,
+          Shot and missile movements are recorded on EVERY displayed frame
+          to allow adjacent simulation-tick and same-tick comparisons.
+          Other object/motion/interpolation details trace every frame through 9,999,
           then every 6th frame up to 29,999, every 16th to 59,999,
           then every 48th frame. Sprite details are sampled every
           2nd/8th/24th/48th frame in those respective periods.
@@ -502,8 +504,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2EffectMotion-Win64
-          path: release/InsaniquariumEnhanced-M2EffectMotion-Win64.zip
+          name: InsaniquariumEnhanced-M2EffectFullTrace-Win64
+          path: release/InsaniquariumEnhanced-M2EffectFullTrace-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -515,11 +517,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 experimental 60 FPS — Shot Effect Motion + Sound Cadence
+          ## M2 experimental 60 FPS — Continuous Shot and Missile Tracing
 
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
+          - Capture every displayed shot/missile position with a separate per-frame
+            effects budget, even after the ordinary detail sampler thins out.
+          - Enable consecutive-tick and same-tick motion audit for long sessions.
+          - Keep other object CSV sampling rates and the original engine unchanged.
+          - Preserve M2 EffectMotion and ShotInit releases under their old tags.
           - Log shot-effect simulation positions without changing drawing or physics.
           - Audit shot movement, jumps, same-tick changes and missing sample intervals.
           - Keep shot sound/game callbacks on original 28ms M2 simulation ticks;
@@ -683,7 +690,7 @@ jobs:
               $code = $LASTEXITCODE
             }
           } else {
-            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Shot Effect Diagnostics (Experimental)' --notes $notes --prerelease 2>&1
+            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Continuous Effect Motion Trace (Experimental)' --notes $notes --prerelease 2>&1
             $code = $LASTEXITCODE
           }
           if ($code -ne 0) {
