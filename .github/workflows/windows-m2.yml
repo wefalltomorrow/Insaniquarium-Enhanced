@@ -520,11 +520,11 @@ jobs:
           This is an opt-in Windows x64 test build, **not** the stable release.
 
           ### New in this test
-- Log shot-effect simulation positions without changing drawing or physics.
-- Audit shot movement, jumps, same-tick changes and missing sample intervals.
-- Keep shot sound/game callbacks on original 28ms M2 simulation ticks;
-  the old non-M2 mode still executes them in Draw().
-- Add M2 C++ and Python regression tests for these changes.
+          - Log shot-effect simulation positions without changing drawing or physics.
+          - Audit shot movement, jumps, same-tick changes and missing sample intervals.
+          - Keep shot sound/game callbacks on original 28ms M2 simulation ticks;
+            the old non-M2 mode still executes them in Draw().
+          - Add M2 C++ and Python regression tests for these changes.
           - Fix original WinFish Shot(x, y, kind) reading the uninitialised
             shot kind before selecting its initial animation delay.
           - Assign requested kind before the existing branching RNG logic;
