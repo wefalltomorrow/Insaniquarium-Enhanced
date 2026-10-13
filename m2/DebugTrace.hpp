@@ -46,6 +46,7 @@ class Recorder {
     unsigned spriteCount = 0, invalidSpriteCount = 0, skippedSpriteCount = 0, celChanges = 0;
     unsigned currentWarnings = 0;
     unsigned perFrameObjects = 0, perFrameSprites = 0, perFrameMotion = 0;
+    unsigned perFrameEffectMotion = 0;
     unsigned lastSecondWarnings = 0;
     double lastFrameMs = 0, lastSimRate = 0, lastPresentRate = 0;
     std::map<std::pair<int, uintptr_t>, ObjectState> observations;
@@ -53,6 +54,7 @@ class Recorder {
     char title[256] = {};
     static constexpr unsigned kObjectsPerFrame = 160;
     static constexpr unsigned kSpritesPerFrame = 220;
+    static constexpr unsigned kEffectMotionPerFrame = 64;
     static constexpr unsigned long long kTraceRowLimit = 350000;
 
     static FILE* Open(const char* name, const char* header) {
@@ -98,6 +100,11 @@ public:
         if (presentFrame < 30000ULL) return (presentFrame % 6ULL) == 0ULL;
         if (presentFrame < 60000ULL) return (presentFrame % 16ULL) == 0ULL;
         return (presentFrame % 48ULL) == 0ULL;
+    }
+    // Shots and missiles need adjacent 28ms ticks for meaningful motion audits.
+    // Keep other large CSV streams sparse during long sessions.
+    static bool SampleMotionFrame(Kind kind, unsigned long long presentFrame) {
+        return kind == Missile || kind == ShotEffect || SampleDetailFrame(presentFrame);
     }
     static bool SampleSpriteFrame(unsigned long long presentFrame) {
         if (presentFrame < 10000ULL) return (presentFrame % 2ULL) == 0ULL;
@@ -207,10 +214,15 @@ public:
     // Coin/food/alien/pet/missile/shot positions stay separate from fish interpolation.
     void ObjectMotion(Kind kind, const void* object, double x, double y,
                       int dx, int dy, double blend, bool paused, bool history) {
-        if (!active || (kind != Coin && kind != Food && kind != Alien && kind != OtherPet && kind != Missile && kind != ShotEffect) || !motion ||
-            !SampleDetailFrame(frame) || motionRows >= kTraceRowLimit ||
-            perFrameMotion >= kObjectsPerFrame) return;
-        ++perFrameMotion;
+        const bool effect = kind == Missile || kind == ShotEffect;
+        if (!active || (kind != Coin && kind != Food && kind != Alien && kind != OtherPet && !effect) || !motion ||
+            !SampleMotionFrame(kind, frame) || motionRows >= kTraceRowLimit ||
+            (effect ? perFrameEffectMotion >= kEffectMotionPerFrame
+                    : perFrameMotion >= kObjectsPerFrame)) return;
+        // Reserve a separate budget for effect traces; dense coin/food scenes
+        // must not silently suppress our continuous shot/missile samples.
+        if (effect) ++perFrameEffectMotion;
+        else ++perFrameMotion;
         std::fprintf(motion,
             "%llu,%llu,%s,%llu,%.4f,%.4f,%.4f,%.4f,%d,%d,%.5f,%u,%u\n",
             frame, ticks, Name(kind),
@@ -326,6 +338,7 @@ public:
         for (int i=0; i<Kinds; ++i) { update[i] = 0; draw[i] = 0; }
         spriteCount = invalidSpriteCount = skippedSpriteCount = celChanges = 0;
         perFrameObjects = perFrameSprites = perFrameMotion = 0;
+        perFrameEffectMotion = 0;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
         if ((frame % 300) == 0) {
