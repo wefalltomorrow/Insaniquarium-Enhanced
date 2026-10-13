@@ -134,6 +134,17 @@ def main() -> None:
            "0, 0, 0.0, mApp->mBoard && mApp->mBoard->mPause, false);",
            "trace missile simulation position without interpolation")
 
+    # Shot effects currently move on the original simulation clock. Record
+    # their integer positions without introducing render-only shifts.
+    shot = GAME / "Shot.cpp"
+    shot_draw_probe = ("M2Debug::IntDrawGuard m2Probe("
+                       "M2Debug::ShotEffect, this, mX, mY, m0x158);")
+    change(shot, shot_draw_probe,
+           shot_draw_probe +
+           "\n\tM2Debug::Get().ObjectMotion(M2Debug::ShotEffect, this, mX, mY, "
+           "0, 0, 0.0, mApp->mBoard && mApp->mBoard->mPause, false);",
+           "trace shot-effect simulation position without interpolation")
+
     # Fish-type pets inherit Fish::Draw but have their own Update().
     # Count their simulation ticks independently from ordinary guppies.
     fish_pet = GAME / "FishTypePet.cpp"
