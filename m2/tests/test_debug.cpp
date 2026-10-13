@@ -35,6 +35,22 @@ int main() {
     Verify(M2Debug::Recorder::SampleSpriteFrame(30000), "30k sprite-tier sampled");
     Verify(M2Debug::Recorder::SampleSpriteFrame(60000), "60k sprite-tier sampled");
     Verify(!M2Debug::Recorder::SampleSpriteFrame(60001), "60k sprite-tier sparse");
+    // Continuous effects logging is separate from sparse ordinary object
+    // sampling and does not affect the sprite or frame CSV cadence.
+    Verify(!M2Debug::Recorder::SampleMotionFrame(M2Debug::Coin, 10000),
+           "unsampled 10k coin motion remains sparse");
+    Verify(!M2Debug::Recorder::SampleMotionFrame(M2Debug::Food, 30001),
+           "unsampled 30k food motion remains sparse");
+    Verify(!M2Debug::Recorder::SampleMotionFrame(M2Debug::Alien, 60001),
+           "unsampled 60k alien motion remains sparse");
+    Verify(M2Debug::Recorder::SampleMotionFrame(M2Debug::ShotEffect, 10000),
+           "shot motion retained on 10k unsampled frames");
+    Verify(M2Debug::Recorder::SampleMotionFrame(M2Debug::ShotEffect, 30001),
+           "shot motion retained on 30k unsampled frames");
+    Verify(M2Debug::Recorder::SampleMotionFrame(M2Debug::Missile, 60001),
+           "missile motion retained on 60k unsampled frames");
+    Verify(M2Debug::Recorder::SampleMotionFrame(M2Debug::ShotEffect, 117169),
+           "shot motion retained after 33 minutes");
     auto& diag = M2Debug::Get();
     Verify(diag.Active(), "debug opt-in");
     diag.Begin(16.67, 0.3, 1);
