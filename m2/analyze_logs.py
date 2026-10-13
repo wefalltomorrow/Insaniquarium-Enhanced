@@ -141,7 +141,7 @@ def analyze(folder: Path):
             "{}={}".format(k, v) for k, v in skipped.most_common(8)))
 
     for filename, label in (("M2DebugInterpolation.csv", "fish"),
-                            ("M2DebugObjectMotion.csv", "coin/food/alien/pet/missile")):
+                            ("M2DebugObjectMotion.csv", "coin/food/alien/pet/missile/shot")):
         counts = collections.Counter()
         moving = collections.Counter()
         max_offsets = collections.defaultdict(lambda: [0.0, 0.0])
@@ -195,13 +195,13 @@ def analyze(folder: Path):
     missile_detail, missile_notes = audit_missile_motion(folder)
     if missile_detail:
         report.append("")
-        report.append("Missile simulation motion (not yet interpolated):")
+        report.append("Missile simulation motion and rendered offsets:")
         report.extend("- " + entry for entry in missile_detail)
     notes.extend(missile_notes)
     shot_detail, shot_notes = audit_shot_effect_motion(folder)
     if shot_detail:
         report.append("")
-        report.append("Shot-effect simulation motion (not yet interpolated):")
+        report.append("Shot-effect simulation motion and rendered offsets:")
         report.extend("- " + entry for entry in shot_detail)
     notes.extend(shot_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
