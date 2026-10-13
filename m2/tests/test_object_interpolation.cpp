@@ -114,6 +114,38 @@ int main() {
         Verify(petTeleport.ShiftX() == 0 && petTeleport.ShiftY() == 0,
                "other-pet teleport guard remains active");
     }
+    // The latest EffectFullTrace game recording observed only 0px or -2px
+    // consecutive-tick shot movement. Smooth just these rising smoke sprites.
+    prev = true;
+    {
+        ScopedObjectTranslation<GraphicsProbe> risingSmoke(
+            &g, true, false, prev, 220, 200, 220, 198,
+            220, 198, .5, 4.0);
+        Verify(risingSmoke.ShiftX() == 0 && risingSmoke.ShiftY() == 1,
+               "moving smoke renders between 28ms simulation positions");
+        Verify(g.y == 1, "shot's graphics-only translation is active");
+    }
+    Verify(g.y == 0, "shot visual translation restored after Draw");
+    {
+        ScopedObjectTranslation<GraphicsProbe> smokeGuard(
+            &g, true, false, prev, 220, 200, 220, 195,
+            220, 195, .5, 4.0);
+        Verify(smokeGuard.ShiftY() == 0, "smoke movement >=4px is rejected");
+    }
+    {
+        ScopedObjectTranslation<GraphicsProbe> staticExplosion(
+            &g, false, false, prev, 220, 200, 220, 198,
+            220, 198, .5, 4.0);
+        Verify(staticExplosion.ShiftY() == 0,
+               "stationary explosion and laser types remain unchanged");
+    }
+    {
+        ScopedObjectTranslation<GraphicsProbe> pausedSmoke(
+            &g, true, true, prev, 220, 200, 220, 198,
+            220, 198, .5, 4.0);
+        Verify(pausedSmoke.ShiftY() == 0 && !prev,
+               "paused smoke cannot use stale interpolation history");
+    }
     Verify(g.x == 0 && g.y == 0, "all visual translation operations balanced");
     std::puts("PASS M2 coin/food visual interpolation scope and pause guards");
 }
