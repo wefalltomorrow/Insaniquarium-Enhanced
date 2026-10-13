@@ -197,20 +197,18 @@ def audit_fish_interpolation(folder: Path):
 
 
 def audit_missile_motion(folder: Path):
-    """Summarise read-only missile coordinates from the sampled motion stream.
+    """Audit original-tick missile movement and optional M2 visual offsets.
 
-    The current experimental build does not interpolate missile sprites; all
-    missile offsets are zero by design. This report measures simulation jumps
-    to decide whether a guarded visual shift would be safe in a future build.
+    An active, guarded graphical shift is expected in newer builds. It does
+    not change the underlying simulation coordinates or prove display FPS.
     """
     path = folder / "M2DebugObjectMotion.csv"
     if not path.is_file():
         return [], []
-    prev = {}
+    previous = {}
     ids = set()
-    samples = moved = repeats = jumps = 0
-    max_x = max_y = 0.0
-    warning = []
+    samples = moved = repeats = jumps = shifted = bad_shifts = same_tick_moves = 0
+    max_x = max_y = max_dx = max_dy = 0.0
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as source:
             for row in csv.DictReader(source):
@@ -227,14 +225,21 @@ def audit_missile_motion(folder: Path):
                     dx, dy = float(row["offsetX"]), float(row["offsetY"])
                 except (ValueError, TypeError, KeyError):
                     continue
+                max_dx, max_dy = max(max_dx, abs(dx)), max(max_dy, abs(dy))
                 if dx or dy:
-                    warning.append("WARN: Missile position trace contains a nonzero render offset.")
-                if key in prev:
-                    old_tick, old_x, old_y = prev[key]
+                    shifted += 1
+                    # The interpolation guard rejects >=8px per tick. The
+                    # rendered integer offset must not exceed that bound.
+                    if abs(dx) > 8 or abs(dy) > 8 or (
+                        row.get("paused") == "1" or row.get("hasHistory") == "0"
+                    ):
+                        bad_shifts += 1
+                if key in previous:
+                    old_tick, old_x, old_y = previous[key]
                     if tick == old_tick:
                         repeats += 1
                         if abs(x-old_x) > .005 or abs(y-old_y) > .005:
-                            warning.append("WARN: Missile position changed without a simulation tick.")
+                            same_tick_moves += 1
                     elif tick == old_tick + 1:
                         step_x, step_y = abs(x-old_x), abs(y-old_y)
                         if step_x > .005 or step_y > .005:
@@ -242,26 +247,36 @@ def audit_missile_motion(folder: Path):
                         max_x, max_y = max(max_x, step_x), max(max_y, step_y)
                         if step_x >= 48 or step_y >= 48:
                             jumps += 1
-                prev[key] = tick, x, y
+                previous[key] = tick, x, y
     except (OSError, csv.Error) as exc:
         return [], ["WARN: Missile motion audit could not read CSV: {}.".format(exc)]
     if not samples:
         return [], ["INFO: Missile movement not captured in the sampled motion stream."]
     result = ["missile: {:,} draws, {} object IDs, {:,} adjacent-tick movements; "
               "largest consecutive step X/Y {:.2f}/{:.2f}px; {} guard-sized jumps; "
-              "{:,} same-tick repeat draws".format(
-                 samples, len(ids), moved, max_x, max_y, jumps, repeats)]
+              "{:,} same-tick repeat draws; {:,} interpolated draws; "
+              "maximum render offsets X/Y {:.2f}/{:.2f}px".format(
+                  samples, len(ids), moved, max_x, max_y, jumps, repeats,
+                  shifted, max_dx, max_dy)]
+    notes = []
     if jumps:
-        warning.append("INFO: Missile teleports/rapid movement need investigation before adding interpolation.")
-    return result, list(dict.fromkeys(warning))
+        notes.append("INFO: Missile teleports/rapid movement need investigation before adding interpolation.")
+    if same_tick_moves:
+        notes.append("WARN: Missile simulation coordinates changed on {} same-tick redraw(s).".format(same_tick_moves))
+    if bad_shifts:
+        notes.append("WARN: {} missile render offset(s) exceeded guard limits or occurred paused/without history.".format(bad_shifts))
+    if moved and not shifted:
+        notes.append("INFO: No nonzero missile render offsets were captured; graphical smoothing not verified in this recording.")
+    return result, notes
 
 
 def audit_shot_effect_motion(folder: Path):
-    """Inspect shot/explosion movement without assuming unsampled ticks are safe.
+    """Inspect motion of shot effects with or without M2 smoke smoothing.
 
-    Shot positions are *not* interpolated. This optional trace was added after
-    M2 ShotInit; older recordings may correctly have no shot_effect motion
-    records. A sampled gap is not a consecutive simulation-tick transition.
+    Only smoke types 6 and 7 receive guarded render-only translations in
+    current M2; legacy builds legitimately log zero visual offsets. Reused
+    object pointers can yield apparent adjacent-tick jumps: keep reset/no-
+    history jumps distinct from valid-history unexplained jumps.
     """
     path = folder / "M2DebugObjectMotion.csv"
     if not path.is_file():
@@ -269,9 +284,9 @@ def audit_shot_effect_motion(folder: Path):
     previous = {}
     ids = set()
     samples = repeats = same_tick_moves = adjacent = moves = jumps = gaps = 0
-    unexpected_offsets = 0
+    visual_shifts = bad_shifts = new_history_jumps = uncertain_jumps = 0
     tick_rewinds = 0
-    max_x = max_y = 0.0
+    max_x = max_y = max_dx = max_dy = 0.0
     try:
         with path.open("r", encoding="utf-8-sig", newline="") as source:
             for row in csv.DictReader(source):
@@ -284,29 +299,36 @@ def audit_shot_effect_motion(folder: Path):
                 ids.add(key)
                 try:
                     tick = int(row["gameTick"])
-                    x = float(row["simulationX"])
-                    y = float(row["simulationY"])
-                    dx = float(row.get("offsetX", 0))
-                    dy = float(row.get("offsetY", 0))
+                    x, y = float(row["simulationX"]), float(row["simulationY"])
+                    dx, dy = float(row.get("offsetX", 0)), float(row.get("offsetY", 0))
                 except (ValueError, TypeError, KeyError):
                     continue
+                max_dx, max_dy = max(max_dx, abs(dx)), max(max_dy, abs(dy))
                 if dx or dy:
-                    unexpected_offsets += 1
+                    visual_shifts += 1
+                    if abs(dx) > 4 or abs(dy) > 4 or (
+                        row.get("paused") == "1" or row.get("hasHistory") == "0"
+                    ):
+                        bad_shifts += 1
                 if key in previous:
                     old_tick, old_x, old_y = previous[key]
                     delta = tick - old_tick
                     step_x, step_y = abs(x - old_x), abs(y - old_y)
                     if delta == 0:
                         repeats += 1
-                        if step_x > 0.005 or step_y > 0.005:
+                        if step_x > .005 or step_y > .005:
                             same_tick_moves += 1
                     elif delta == 1:
                         adjacent += 1
                         max_x, max_y = max(max_x, step_x), max(max_y, step_y)
-                        if step_x > 0.005 or step_y > 0.005:
+                        if step_x > .005 or step_y > .005:
                             moves += 1
                         if step_x >= 48.0 or step_y >= 48.0:
                             jumps += 1
+                            if row.get("hasHistory") == "0" and not dx and not dy:
+                                new_history_jumps += 1
+                            else:
+                                uncertain_jumps += 1
                     elif delta > 1:
                         gaps += 1
                     else:
@@ -317,12 +339,13 @@ def audit_shot_effect_motion(folder: Path):
     if not samples:
         return [], ["INFO: No shot-effect motion samples; older M2 builds do not emit this trace. "
                     "No shot animation smoothness conclusion is possible."]
-
     lines = [
         "shot_effect: {:,} sampled draws, {} object IDs, {:,} adjacent-tick pairs "
         "({:,} moving); largest consecutive step X/Y {:.2f}/{:.2f}px; "
-        "{} guard-sized jumps; {:,} same-tick redraws; {:,} unsampled tick gaps".format(
-            samples, len(ids), adjacent, moves, max_x, max_y, jumps, repeats, gaps)
+        "{} guard-sized jumps; {:,} same-tick redraws; {:,} unsampled tick gaps; "
+        "{:,} visual shifts; maximum render offsets X/Y {:.2f}/{:.2f}px".format(
+            samples, len(ids), adjacent, moves, max_x, max_y, jumps,
+            repeats, gaps, visual_shifts, max_dx, max_dy)
     ]
     notes = []
     if not adjacent:
@@ -334,12 +357,16 @@ def audit_shot_effect_motion(folder: Path):
     if same_tick_moves:
         notes.append("WARN: Shot-effect simulation coordinates changed on {} "
                      "same-tick redraw(s); investigate before interpolating.".format(same_tick_moves))
-    if unexpected_offsets:
-        notes.append("WARN: Shot-effect trace has {} nonzero visual offset(s) "
-                     "though interpolation is disabled.".format(unexpected_offsets))
-    if jumps:
-        notes.append("INFO: Shot-effect movement contains {} >=48px consecutive-tick "
-                     "jump(s); inspect possible respawns or teleports.".format(jumps))
+    if bad_shifts:
+        notes.append("WARN: {} shot-effect visual shift(s) exceeded guards or occurred "
+                     "during pause/without history.".format(bad_shifts))
+    if new_history_jumps:
+        notes.append("INFO: {} >=48px shot-effect jump(s) had reset visual history "
+                     "and zero offset; likely newly spawned objects reusing addresses, "
+                     "but object identity cannot be proven from this trace.".format(new_history_jumps))
+    if uncertain_jumps:
+        notes.append("INFO: {} >=48px shot-effect jump(s) lacked confirmed reset/no-shift "
+                     "evidence; investigate before broad interpolation.".format(uncertain_jumps))
     if tick_rewinds:
         notes.append("INFO: {} shot-effect tick rewind(s); check whether object IDs "
                      "were reused or captures mixed.".format(tick_rewinds))
