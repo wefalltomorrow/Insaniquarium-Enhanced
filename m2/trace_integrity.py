@@ -254,3 +254,93 @@ def audit_missile_motion(folder: Path):
     if jumps:
         warning.append("INFO: Missile teleports/rapid movement need investigation before adding interpolation.")
     return result, list(dict.fromkeys(warning))
+
+
+def audit_shot_effect_motion(folder: Path):
+    """Inspect shot/explosion movement without assuming unsampled ticks are safe.
+
+    Shot positions are *not* interpolated. This optional trace was added after
+    M2 ShotInit; older recordings may correctly have no shot_effect motion
+    records. A sampled gap is not a consecutive simulation-tick transition.
+    """
+    path = folder / "M2DebugObjectMotion.csv"
+    if not path.is_file():
+        return [], ["INFO: Shot-effect motion CSV absent; animation movement unverified."]
+    previous = {}
+    ids = set()
+    samples = repeats = same_tick_moves = adjacent = moves = jumps = gaps = 0
+    unexpected_offsets = 0
+    tick_rewinds = 0
+    max_x = max_y = 0.0
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            for row in csv.DictReader(source):
+                if row.get("kind") != "shot_effect":
+                    continue
+                samples += 1
+                key = row.get("objectId")
+                if not key:
+                    continue
+                ids.add(key)
+                try:
+                    tick = int(row["gameTick"])
+                    x = float(row["simulationX"])
+                    y = float(row["simulationY"])
+                    dx = float(row.get("offsetX", 0))
+                    dy = float(row.get("offsetY", 0))
+                except (ValueError, TypeError, KeyError):
+                    continue
+                if dx or dy:
+                    unexpected_offsets += 1
+                if key in previous:
+                    old_tick, old_x, old_y = previous[key]
+                    delta = tick - old_tick
+                    step_x, step_y = abs(x - old_x), abs(y - old_y)
+                    if delta == 0:
+                        repeats += 1
+                        if step_x > 0.005 or step_y > 0.005:
+                            same_tick_moves += 1
+                    elif delta == 1:
+                        adjacent += 1
+                        max_x, max_y = max(max_x, step_x), max(max_y, step_y)
+                        if step_x > 0.005 or step_y > 0.005:
+                            moves += 1
+                        if step_x >= 48.0 or step_y >= 48.0:
+                            jumps += 1
+                    elif delta > 1:
+                        gaps += 1
+                    else:
+                        tick_rewinds += 1
+                previous[key] = tick, x, y
+    except (OSError, csv.Error) as exc:
+        return [], ["WARN: Shot-effect movement audit could not read CSV: {}.".format(exc)]
+    if not samples:
+        return [], ["INFO: No shot-effect motion samples; older M2 builds do not emit this trace. "
+                    "No shot animation smoothness conclusion is possible."]
+
+    lines = [
+        "shot_effect: {:,} sampled draws, {} object IDs, {:,} adjacent-tick pairs "
+        "({:,} moving); largest consecutive step X/Y {:.2f}/{:.2f}px; "
+        "{} guard-sized jumps; {:,} same-tick redraws; {:,} unsampled tick gaps".format(
+            samples, len(ids), adjacent, moves, max_x, max_y, jumps, repeats, gaps)
+    ]
+    notes = []
+    if not adjacent:
+        notes.append("INFO: No consecutive-tick shot-effect positions recorded; "
+                     "motion safety and interpolation cannot be assessed.")
+    if gaps:
+        notes.append("INFO: Shot-effect trace skips {} tick interval(s); "
+                     "do not interpret gaps as individual movement steps.".format(gaps))
+    if same_tick_moves:
+        notes.append("WARN: Shot-effect simulation coordinates changed on {} "
+                     "same-tick redraw(s); investigate before interpolating.".format(same_tick_moves))
+    if unexpected_offsets:
+        notes.append("WARN: Shot-effect trace has {} nonzero visual offset(s) "
+                     "though interpolation is disabled.".format(unexpected_offsets))
+    if jumps:
+        notes.append("INFO: Shot-effect movement contains {} >=48px consecutive-tick "
+                     "jump(s); inspect possible respawns or teleports.".format(jumps))
+    if tick_rewinds:
+        notes.append("INFO: {} shot-effect tick rewind(s); check whether object IDs "
+                     "were reused or captures mixed.".format(tick_rewinds))
+    return lines, notes
