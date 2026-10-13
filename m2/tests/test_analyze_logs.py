@@ -34,9 +34,9 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
                  "frame,gameTick,kind,objectId,simulationX,simulationY,offsetX,offsetY,paused",
                  [[0, 1, "coin", 100, 15, 20, -1, 0, 0],
                   [0, 1, "food", 200, 15, 20, 0, -1, 0],
+                  [0, 1, "shot_effect", 500, 100, 150, 0, 0, 0],
                   [1, 1, "coin", 100, 15, 20, 0, 0, 1],
                   [1, 1, "missile", 400, 100, 150, 0, 0, 0],
-                  [0, 1, "shot_effect", 500, 100, 150, 0, 0, 0],
                   [1, 2, "shot_effect", 500, 102, 150, 0, 0, 0]])
         self.csv("M2DebugInterpolation.csv",
                  "frame,gameTick,objectId,offsetX,offsetY",
@@ -51,7 +51,8 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
         self.assertIn("Recorded frame rows: 2", message)
         self.assertIn("59.980FPS", message)
         self.assertIn("coin: 2 samples, 1 shifted", message)
-        self.assertIn("No shot-effect motion samples", message)
+        self.assertIn("Shot-effect simulation motion", message)
+        self.assertIn("1 adjacent-tick pairs (1 moving)", message)
         self.assertNotIn("ERROR:", message)
         self.assertNotIn("WARN:", message)
 
