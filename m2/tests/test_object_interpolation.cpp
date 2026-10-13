@@ -146,6 +146,32 @@ int main() {
         Verify(pausedSmoke.ShiftY() == 0 && !prev,
                "paused smoke cannot use stale interpolation history");
     }
+    // Captured missiles moved at most 2.5px per axis on consecutive ticks.
+    prev = true;
+    {
+        ScopedObjectTranslation<GraphicsProbe> missile(
+            &g, true, false, prev,
+            160.0, 180.0, 162.5, 181.25, 162, 181, .5, 8.0);
+        Verify(missile.ShiftX() == -1 && missile.ShiftY() == 0,
+               "missile sprite interpolates fractional 2.5px simulation step");
+        Verify(g.x == -1, "missile visual offset affects Graphics only");
+    }
+    Verify(g.x == 0 && g.y == 0,
+           "missile graphics translation restored after Draw");
+    {
+        ScopedObjectTranslation<GraphicsProbe> missileTeleport(
+            &g, true, false, prev,
+            100, 180, 108, 181, 108, 181, .5, 8.0);
+        Verify(missileTeleport.ShiftX() == 0,
+               "missile movement >=8px per tick rejected");
+    }
+    {
+        ScopedObjectTranslation<GraphicsProbe> missilePaused(
+            &g, true, true, prev,
+            160, 180, 162.5, 181.25, 162, 181, .5, 8.0);
+        Verify(missilePaused.ShiftX() == 0 && !prev,
+               "missile history clears on pause");
+    }
     Verify(g.x == 0 && g.y == 0, "all visual translation operations balanced");
     std::puts("PASS M2 coin/food visual interpolation scope and pause guards");
 }
