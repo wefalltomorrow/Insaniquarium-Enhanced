@@ -11,7 +11,7 @@ import csv
 from pathlib import Path
 import re
 import statistics
-from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion
+from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion, audit_shot_effect_motion
 
 def rows(folder: Path, filename: str):
     path = folder / filename
@@ -198,6 +198,12 @@ def analyze(folder: Path):
         report.append("Missile simulation motion (not yet interpolated):")
         report.extend("- " + entry for entry in missile_detail)
     notes.extend(missile_notes)
+    shot_detail, shot_notes = audit_shot_effect_motion(folder)
+    if shot_detail:
+        report.append("")
+        report.append("Shot-effect simulation motion (not yet interpolated):")
+        report.extend("- " + entry for entry in shot_detail)
+    notes.extend(shot_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
     report.append("presentation, visual smoothness, audio fidelity and all gameplay modes")
     report.append("require separate observation/testing.")
