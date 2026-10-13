@@ -49,7 +49,9 @@ class DiagnosticAnalyzerTests(unittest.TestCase):
         self.assertIn("Recorded frame rows: 2", message)
         self.assertIn("59.980FPS", message)
         self.assertIn("coin: 2 samples, 1 shifted", message)
-        self.assertIn("No automated issues detected", message)
+        self.assertIn("No shot-effect motion samples", message)
+        self.assertNotIn("ERROR:", message)
+        self.assertNotIn("WARN:", message)
 
     def test_invalid_sprite_detected(self):
         self.normal()
