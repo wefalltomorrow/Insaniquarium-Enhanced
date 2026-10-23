@@ -34,6 +34,9 @@ class Recorder {
     FILE* sprites = nullptr;
     FILE* interp = nullptr;
     FILE* motion = nullptr;
+    FILE* animation = nullptr;
+    unsigned long long animationRows = 0;
+    unsigned perFrameAnimation = 0;
     FILE* invalidSprites = nullptr;
     FILE* skippedSprites = nullptr;
     FILE* events = nullptr;
@@ -87,6 +90,7 @@ public:
         if (sprites) std::fclose(sprites);
         if (interp) std::fclose(interp);
         if (motion) std::fclose(motion);
+        if (animation) std::fclose(animation);
         if (invalidSprites) std::fclose(invalidSprites);
         if (skippedSprites) std::fclose(skippedSprites);
         if (events) std::fclose(events);
@@ -125,6 +129,8 @@ public:
             "frame,gameTick,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend\n");
         motion = Open("M2DebugObjectMotion.csv",
             "frame,gameTick,kind,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend,paused,hasHistory\n");
+        animation = Open("M2DebugSmokeAnimation.csv",
+            "frame,gameTick,objectId,shotType,simulationAge,simulationCel,fromCel,toCel,mix,transition,paused\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
             "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         skippedSprites = Open("M2DebugSkippedSprites.csv",
@@ -132,8 +138,18 @@ public:
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !motion || !invalidSprites || !skippedSprites || !events)
+        if (!frames || !objects || !sprites || !interp || !motion || !animation || !invalidSprites || !skippedSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
+    }
+
+    void SmokeAnimation(const void* object, int type, int age, int cel,
+                        int from, int to, double mix, bool transition, bool paused) {
+        if (!active || !animation || animationRows >= kTraceRowLimit ||
+            perFrameAnimation >= kEffectMotionPerFrame) return;
+        ++animationRows;
+        ++perFrameAnimation;
+        std::fprintf(animation, "%llu,%llu,%p,%d,%d,%d,%d,%d,%.6f,%d,%d\n",
+                     frame, ticks, object, type, age, cel, from, to, mix, transition, paused);
     }
 
     void Begin(double elapsedMs, double blend, int simSteps) {
@@ -339,6 +355,7 @@ public:
         spriteCount = invalidSpriteCount = skippedSpriteCount = celChanges = 0;
         perFrameObjects = perFrameSprites = perFrameMotion = 0;
         perFrameEffectMotion = 0;
+        perFrameAnimation = 0;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
         if ((frame % 300) == 0) {
@@ -347,6 +364,7 @@ public:
             if (sprites) std::fflush(sprites);
             if (interp) std::fflush(interp);
             if (motion) std::fflush(motion);
+            if (animation) std::fflush(animation);
             if (invalidSprites) std::fflush(invalidSprites);
             if (skippedSprites) std::fflush(skippedSprites);
             if (events) std::fflush(events);

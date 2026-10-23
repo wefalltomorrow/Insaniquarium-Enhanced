@@ -100,14 +100,30 @@ int main() {
     diag.ObjectMotion(M2Debug::ShotEffect, &id, 30, 40, 0, 0, 0.0, false, false);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
     diag.UnsafeFishPosition(&id, -5.653851e214, 20.0);
+    // Separate animation budget: 65 calls emit 64 rows this frame.
+    for (int i=0; i<65; ++i)
+        diag.SmokeAnimation(&id, 6, 4, 1, 0, 1, 0.3, true, false);
     diag.End(1, true, true, 16.67, 1.05, 0.3);
     diag.Begin(16.67, 0.8, 0);
+    diag.SmokeAnimation(&id, 6, 4, 1, 0, 1, 0.8, true, false);
     diag.Drawn(M2Debug::Fish, &id, 12, 20, 3);
     diag.End(0, true, true, 16.67, 1.05, 0.8);
     diag.WindowTitle(35.7, 59.9);
     Verify(std::strstr(diag.Title(), "35.7") != nullptr, "titlebar statistics");
 
     std::fflush(nullptr); // flush recorder streams before inspecting files
+    FILE* anim = std::fopen("M2DebugSmokeAnimation.csv", "rb");
+    Verify(anim != nullptr, "smoke animation output exists");
+    char animRow[512] = {};
+    Verify(std::fgets(animRow, sizeof(animRow), anim) != nullptr &&
+           std::strstr(animRow, "simulationAge,simulationCel,fromCel,toCel,mix") != nullptr,
+           "smoke animation CSV schema");
+    int animationRows = 0;
+    while (std::fgets(animRow, sizeof(animRow), anim)) ++animationRows;
+    Verify(animationRows == 65, "independent per-frame animation budget resets");
+    Verify(std::strstr(animRow, ",6,4,1,0,1,0.800000,1,0") != nullptr,
+           "same simulation fields with a new presentation mix");
+    std::fclose(anim);
     FILE* csv = std::fopen("M2DebugFrames.csv", "rb");
     Verify(csv != nullptr, "frames output exists");
     char frameHeader[1024] = {};

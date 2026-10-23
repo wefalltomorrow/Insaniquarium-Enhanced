@@ -1,5 +1,13 @@
 # Insaniquarium Enhanced
 
+**Current M2 engineering status (23 October 2026):** see
+[the living handover](m2/ENGINEERING_STATUS.md) and
+[optional smoke animation comparison](m2/SMOKE_ANIMATION_TEST.md).
+The M2 branch retains 28 ms simulation with independent presentation and position
+interpolation. Its new smoke-cell crossfade is separately opt-in. Older sections
+below record earlier milestones; consult the handover for current verification
+gaps. Stable M1.2 remains on `main`.
+
 A modern Windows x64 build of **Insaniquarium! Deluxe**, based on the community [WinFish decompilation](https://github.com/Vindirect/WinFish) and [SaMeiers' SDL3/PopLib native port](https://github.com/SaMeiers/insaniquarium-port). No executable hooking or proxy DLL patches.
 
 ## Downloads

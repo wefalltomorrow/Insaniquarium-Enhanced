@@ -204,6 +204,12 @@ def analyze(folder: Path):
         report.append("Shot-effect simulation motion and rendered offsets:")
         report.extend("- " + entry for entry in shot_detail)
     notes.extend(shot_notes)
+    from smoke_animation_audit import audit_smoke_animation
+    smoke_detail, smoke_notes = audit_smoke_animation(folder)
+    if smoke_detail:
+        report.append("")
+        report.extend(smoke_detail)
+    notes.extend(smoke_notes)
     report.append("Interpretation: measures logged game-side behaviour only; external frame")
     report.append("presentation, visual smoothness, audio fidelity and all gameplay modes")
     report.append("require separate observation/testing.")
