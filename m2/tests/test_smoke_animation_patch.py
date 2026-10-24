@@ -21,6 +21,10 @@ class SmokePatchTests(unittest.TestCase):
         self.assertIn(SYNC_BODY,s)
         self.assertEqual(s.count("theSync->SyncLong("),5)
         self.assertIn("SmokeAnimationHistory mM2SmokeAnimation",h)
+        self.assertIn("SmokePixelBuffer<PopLib::MemoryImage> mM2SmokePixels",h)
+        self.assertIn('#include "PopLib/graphics/memoryimage.hpp"',h)
+        self.assertLess(s.index("mM2SmokePixels.Prepare"),s.index("M2Debug::Get().SmokeAnimation"))
+        self.assertEqual(s.count("static_cast<Image*>(m2SmokeImage)"),2)
         self.assertIn("mM2SmokeAnimation.valid = false;",s[s.index(SYNC):])
         self.assertEqual(s.count("DrawSmokeFrames"),2)
         for im in ["IMAGE_SMOKEMISSILE","IMAGE_EXPLOSION"]:

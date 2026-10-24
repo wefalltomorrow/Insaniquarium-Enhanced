@@ -1,4 +1,4 @@
-# M2 engineering handover — 23 October 2026
+# M2 engineering handover â€” 24 October 2026
 
 This is the current engineering status. Older appended README sections describe
 historical stages and may contradict later implementations. Keep evidence levels
@@ -13,9 +13,12 @@ user acceptance are different claims.
   `feature/m2-fixed-timestep`. Open PR #5 targets main; it is not approval to merge.
 - Latest published baseline at recovery: `m2-updater-fix-20261013`, asset
   `InsaniquariumEnhanced-M2UpdaterFix-Win64.zip`, successful CI `38393586383`.
-- This continuation prepares a distinct `m2-smoke-animation-20261023` release.
-  Treat it as published only after the workflow and downloadable asset exist.
-  The ZIP includes `BUILD_INFO.json` identifying its actual source commit/run.
+- Published October 23 smoke baseline: m2-smoke-animation-20261023,
+  commit 59bdb74cde9f455f3e360b72938c43c0983bf742, successful CI 39937822570.
+  ZIP SHA256: 9026c074ea3a9c7722cc6eb1b9d03bcdbde13e0d7e88166d2e37f02ddbc22e2f.
+- October 24 continuation prepares m2-smoke-pixels-20261024. Treat it as
+  published only after CI and the asset are verified. BUILD_INFO.json records
+  source/run/tag and smoke_compositing=premultiplied-pixels-v1.
 - Pinned native port: `95d4aafe408b36e8a195982ad7acbae5fb6a0b33`;
   WinFish: `f919b3c241cfd611c547f1653fb3514f500f761b`;
   PopLib gitlink: `45776cefdeb8cd5bd43ce7f345aa7be1807c7380`.
@@ -41,7 +44,7 @@ exports, raw captures and original game assets are not part of this repository.
 | --- | --- |
 | Early October DLL experiments | D3D11 scaling and repeated presentation exposed cursor mapping, custom cursor, mode-toggle and DirectDraw rebuild failures. Increasing tick rate changed gameplay speed. This route is superseded by the native port; do not port old hooks into M2. |
 | October 9 M0/M1 | Native x64 SDL3/PopLib baseline; newer WinFish pin with overlapping applause fixes reconciled. M1 menu changes and M1.2 in-game updater followed. User reported the stable build worked. |
-| October 9–10 M2 clock | Separate 28 ms simulation and 60 Hz presentation; position history and guards. User saw ~60 FPS. Legacy hardware acceleration could break the renderer, so M2 disables that path. |
+| October 9â€“10 M2 clock | Separate 28 ms simulation and 60 Hz presentation; position history and guards. User saw ~60 FPS. Legacy hardware acceleration could break the renderer, so M2 disables that path. |
 | Pause/input fixes | Freeze/invalidate interpolation during Options; Esc toggles the existing dialog, ignoring key repeats and unrelated dialogs. |
 | Fish/coin/food/alien | Initialize missing positive fish velocity; reject invalid render coordinates; preserve legitimate collected-coin homing with a larger bound; move M2 draw callbacks to simulation. |
 | Pets | FishTypePet bypassed Fish::Update and needed its own history capture. OtherTypePet received its own guarded translation/callback patch. |
@@ -114,12 +117,24 @@ current/previous cels with the existing fractional blend, only for types 6/7 and
 normal drawing. No extrapolated future cel, extra timer increment or new save
 field is introduced. Startup, delay, pause, serialization, unexpected sheet
 layout, age discontinuity and invalid phase fall back to the original draw.
-Color is restored even if a draw exits via an exception.
+The single draw does not modify the caller color, including on exceptions.
 
-This is a two-pass alpha-over experiment, **not** exact pixel interpolation.
-Opacity dips and double edges are possible. Unchanged-cell ticks still draw one
-cel; transitions cover one tick. Keep the option off by default until the user
-judges the comparison. See [test instructions](SMOKE_ANIMATION_TEST.md).
+The October 23 version used two alpha-over passes, which reduced coverage of
+overlapping pixels. The October 24 version composes one cel with interpolated
+coverage and premultiplied RGB, then uses the original single normal draw and
+tint. Transparent RGB is excluded from the color mix. Output remains 8-bit,
+in asset color space, with 1/256 phase precision; it is not linear-light blending.
+Endpoints draw the original sheet. Double edges from differing shapes can remain.
+Unchanged-cell ticks still draw one cel; transitions cover one tick. Keep this
+off by default until visual comparison. See [test instructions](SMOKE_ANIMATION_TEST.md).
+
+SmokePixelBuffer owns one lazy temporary MemoryImage per Shot, capped at 128x128.
+No global resource pointers survive reloads; source pixels are read afresh. The
+buffer is destroyed with its Shot. Invalid sheet dimensions, unavailable pixels
+and allocation failure revert to the current cel before telemetry is recorded.
+Temporary draws bypass SpriteCel instrumentation; use the separate smoke CSV.
+The pinned SDL renderer recreates textures on BitsChanged, so CPU pixel work and
+texture upload cost require runtime comparison. No renderer-wide changes made.
 
 ## Build and verification
 
@@ -139,6 +154,19 @@ CSV detection. Existing clock tests cover 60/120/144/165/240 Hz render schedules
 GitHub CI separately uses MSVC for tests and the complete Windows executable.
 Check its exact commit/run and release contents; local helper tests alone do not
 establish a full game build or gameplay success.
+
+## October 24 validation
+
+All 51 Python tests and eight native C++ programs pass locally. The pixel test
+checks identical coverage for all 256 alpha values at all 257 weights, and
+compares unequal red/blue coverage against an independent floating-point
+reference. It also checks transparent RGB, row stride, source immutability,
+buffer reuse/resize, missing data, allocation failure and fallbacks. Existing
+lifetime, pause/reset, sheet, draw-state and source guards remain covered.
+The revised patch applied to real pinned generated Shot files; entire Update
+and Sync functions are byte-identical to the previous patched source after
+newline normalization. Full Windows build verification follows in CI.
+No new user recording was supplied; smoke visual acceptance remains pending.
 
 ## Next work
 

@@ -45,32 +45,12 @@ struct SmokeAnimationHistory {
     }
 };
 
-// Normal alpha-over crossfade, deliberately restricted to soft smoke. This is
-// not per-pixel linear image interpolation: overlap can change apparent opacity.
-// Keep it optional until visual comparison justifies broader use.
+// Draw a precomposed cel once, preserving caller tint, opacity and translation.
+// Endpoints and fallback use the original sheet directly.
 template<class Graphics, class Image>
-void DrawSmokeFrames(Graphics* g, Image* image, const SmokeFramePlan& plan) {
-    if (!plan.transition) {
-        g->DrawImageCel(image, 0, 0, plan.to);
-        return;
-    }
-    const auto original = g->GetColor();
-    struct RestoreColor {
-        Graphics* g;
-        decltype(original) color;
-        ~RestoreColor() { g->SetColor(color); }
-    } restore{g, original};
-    auto color = original;
-    const int nextAlpha = static_cast<int>(original.mAlpha * plan.mix + 0.5);
-    color.mAlpha = original.mAlpha - nextAlpha;
-    if (color.mAlpha > 0) {
-        g->SetColor(color);
-        g->DrawImageCel(image, 0, 0, plan.from);
-    }
-    color.mAlpha = nextAlpha;
-    if (color.mAlpha > 0) {
-        g->SetColor(color);
-        g->DrawImageCel(image, 0, 0, plan.to);
-    }
+void DrawSmokeFrames(Graphics* g, Image* image, const SmokeFramePlan& plan, Image* composed) {
+    if (plan.transition && composed) g->DrawImage(composed, 0, 0);
+    else g->DrawImageCel(image, 0, 0,
+                        plan.transition && plan.mix == 0.0 ? plan.from : plan.to);
 }
 } // namespace EnhancedM2

@@ -1,5 +1,8 @@
 # Optional smoke animation comparison
 
+Current package: m2-smoke-pixels-20261024. This replaces the October 23
+two-draw crossfade with one pixel-composed image, fixing its overlap opacity dip.
+
 This experiment crossfades adjacent sprite cells for rising smoke types 6 and 7.
 It retains the original 28 ms simulation, effect lifetime, random delay, sound
 callbacks and save fields. It does not add intermediate artwork to fish, pets,
@@ -55,9 +58,18 @@ ticks whose cells do not change still display one cell. This deliberately modest
 test does not claim a continuous all-animation 60 FPS conversion. It shares the
 existing one-tick presentation delay used for interpolated positions.
 
-Normal alpha-over drawing of two sprites is not exact per-pixel linear image
-interpolation. Overlapping pixels can become more transparent, and differing
-shapes can produce double edges. Those are reasons to keep this optional.
+The new draw interpolates coverage and premultiplied RGB before drawing once.
+Identical pixels keep their opacity; hidden RGB in transparent pixels cannot
+create colored fringes. Color remains in the original asset's encoded space,
+with 8-bit output and 1/256 phase precision. This is not motion synthesis:
+differing shapes can still produce double edges. It remains optional.
+
+Each smoke object lazily owns one temporary cel (at most 128 by 128 pixels).
+The pinned renderer recreates its texture when pixel data changes; the extra
+CPU work and texture uploads need performance comparison during busy fights.
+Unsupported sheets, missing pixels or allocation failure revert to the original
+cel and the smoke CSV records a non-transition. The CSV is the authoritative
+animation trace; composed draws use DrawImage and do not emit sprite-sheet rows.
 Startup sentinels, delay, resets and removal retain their original rendering.
 No extra simulation tick, animation event or terminal lifetime is added.
 
