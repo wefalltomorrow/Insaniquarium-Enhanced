@@ -1,6 +1,6 @@
 # Optional smoke animation comparison
 
-Current package: m2-smoke-pixels-20261024. This replaces the October 23
+Current package: m2-smoke-pixels-guard-20261024. This replaces the October 23
 two-draw crossfade with one pixel-composed image, fixing its overlap opacity dip.
 
 This experiment crossfades adjacent sprite cells for rising smoke types 6 and 7.
@@ -45,7 +45,8 @@ The smoke CSV records simulation age/cel independently from drawn cels and
 blend. A positive same-tick-changing-blends count shows presentation changing
 between simulation updates. It does **not** establish that the result looks
 better. Zero transitions may mean no suitable smoke appeared, only unchanged
-cells were sampled, or the optional launcher was not used.
+cells were sampled, source pixels were no longer resident, or the optional
+launcher was not used.
 
 Smoke rows have an independent limit of 64 per frame and 350,000 per run.
 Verbose logs add overhead; compare perceived performance with the non-debug
@@ -67,6 +68,8 @@ differing shapes can still produce double edges. It remains optional.
 Each smoke object lazily owns one temporary cel (at most 128 by 128 pixels).
 The pinned renderer recreates its texture when pixel data changes; the extra
 CPU work and texture uploads need performance comparison during busy fights.
+The blend only reads source pixels already held in CPU memory. If the renderer
+has purged them, it uses the original cel without attempting texture recovery.
 Unsupported sheets, missing pixels or allocation failure revert to the original
 cel and the smoke CSV records a non-transition. The CSV is the authoritative
 animation trace; composed draws use DrawImage and do not emit sprite-sheet rows.

@@ -132,6 +132,11 @@ SmokePixelBuffer owns one lazy temporary MemoryImage per Shot, capped at 128x128
 No global resource pointers survive reloads; source pixels are read afresh. The
 buffer is destroyed with its Shot. Invalid sheet dimensions, unavailable pixels
 and allocation failure revert to the current cel before telemetry is recorded.
+Composition requires resident source mBits before calling GetBits. The pinned
+RecoverBits can return success after a failed static-texture lock, leaving newly
+allocated pixels uninitialized. Purged sources therefore use the original cel
+without recovery or mutation; regression coverage checks no source read occurs
+and blending resumes after pixels become resident. No renderer-wide fix is made.
 Temporary draws bypass SpriteCel instrumentation; use the separate smoke CSV.
 The pinned SDL renderer recreates textures on BitsChanged, so CPU pixel work and
 texture upload cost require runtime comparison. No renderer-wide changes made.

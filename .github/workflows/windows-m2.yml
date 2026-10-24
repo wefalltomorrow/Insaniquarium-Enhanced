@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-smoke-pixels-20261024
-      RELEASE_ASSET: InsaniquariumEnhanced-M2SmokePixels-Win64.zip
+      PUBLIC_TEST_TAG: m2-smoke-pixels-guard-20261024
+      RELEASE_ASSET: InsaniquariumEnhanced-M2SmokePixelsGuard-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -397,6 +397,7 @@ jobs:
             simulation_step_ms = 28
             smoke_animation_default = 'off'
             smoke_compositing = 'premultiplied-pixels-v1'
+            smoke_source_pixels = 'resident-only'
           } | ConvertTo-Json | Set-Content 'stage/BUILD_INFO.json' -Encoding utf8
           @'
           Insaniquarium Enhanced M2 timing test - Windows x64
@@ -523,8 +524,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2SmokePixels-Win64
-          path: release/InsaniquariumEnhanced-M2SmokePixels-Win64.zip
+          name: InsaniquariumEnhanced-M2SmokePixelsGuard-Win64
+          path: release/InsaniquariumEnhanced-M2SmokePixelsGuard-Win64.zip
           if-no-files-found: error
           retention-days: 90
 

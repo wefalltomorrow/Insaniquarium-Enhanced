@@ -34,7 +34,10 @@ public:
             plan = {plan.to, plan.to, 1.0, false};
             return nullptr;
         };
-        if (!source || !std::isfinite(plan.mix) || plan.mix < 0 || plan.mix > 1 ||
+        // GetBits may attempt texture recovery after resource pixels are purged.
+        // The pinned renderer cannot reliably recover static textures, so only
+        // use pixels already resident on the CPU. Never trigger source recovery.
+        if (!source || !source->mBits || !std::isfinite(plan.mix) || plan.mix < 0 || plan.mix > 1 ||
             source->mNumRows != 1 || source->mNumCols <= 0 ||
             source->mNumCols > 64 || source->mWidth <= 0 ||
             source->mWidth % source->mNumCols != 0 ||

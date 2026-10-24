@@ -13,9 +13,12 @@ struct Color { int mRed = 12, mGreen = 34, mBlue = 56, mAlpha = 199; };
 struct Image {
     int mWidth=0, mHeight=0, mNumCols=1, mNumRows=1, updates=0;
     bool noBits=false, fail=false;
+    std::uint32_t* mBits=nullptr;
+    int getBitsCalls=0;
     std::vector<std::uint32_t> bits;
-    void Create(int w, int h) { mWidth=w; mHeight=h; bits.resize(w*h); }
+    void Create(int w, int h) { mWidth=w; mHeight=h; bits.resize(w*h); mBits=bits.data(); }
     std::uint32_t* GetBits() {
+        ++getBitsCalls;
         if (fail) throw std::bad_alloc();
         return noBits ? nullptr : bits.data();
     }
@@ -63,6 +66,18 @@ void pixels() {
     check(composed->bits==std::vector<std::uint32_t>({0xff800080,0x800000ff,0x80112233,0}),"row stride and adjacent cels");
     check(source.bits==original && source.updates==0,"source untouched");
     check(buffer.Prepare(&source,p)==composed && composed->updates==2,"buffer reused");
+    // A purged resource must not attempt texture recovery or reuse an old blend.
+    const int reads=source.getBitsCalls, updates=composed->updates;
+    source.mBits=nullptr; source.fail=true;
+    SmokeFramePlan purged{0,1,0.5,true};
+    check(!buffer.Prepare(&source,purged) && !purged.transition && purged.from==1,
+          "purged source falls back to current cel");
+    check(source.getBitsCalls==reads && !source.mBits && composed->updates==updates,
+          "no source recovery, mutation or stale composition after purge");
+    source.mBits=source.bits.data(); source.fail=false;
+    SmokeFramePlan reloaded{0,1,0.5,true};
+    check(buffer.Prepare(&source,reloaded)==composed && reloaded.transition,
+          "resident pixels can blend again after resource reload");
     source.bits[2]=0xff00ff00;
     buffer.Prepare(&source,p);
     check(composed->bits[0]==0xff808000,"fresh source data after replacement");
