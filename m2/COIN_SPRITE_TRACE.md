@@ -74,7 +74,49 @@ coin descriptor test covers disabled operation, fresh identities at the same
 address, effective tint, transforms and independent per-frame limits. The patch
 was applied to the pinned generated Coin source; its complete Update function,
 graphics calls and serialized fields were compared with the prior source.
-Full Windows build evidence is recorded separately when CI finishes.
+Windows CI 40097480779 passed for commit
+d85c37fdb9fea0b7d90b0e327a71bc5d39a7e255, including the same tests and full
+game build. The published m2-coin-sprite-trace-20261024 ZIP was downloaded and
+checked for source/run/tag metadata, CRCs, x64 executable, launcher settings
+and bundled analyzer content. Its SHA256 is
+0a90d99673e5ab5f2b19ce65e65898fbb82bd62c19702aa655890125b92198f6.
+
+## Transition analyzer update - October 25, 2026
+
+The updated Python analyzer also compares requests for the same lifetime ID
+and owner address in consecutive presentation frames. It keeps at most two
+frames of 64 requests each. An owner absent from the preceding frame starts a
+new observation segment; it is never joined across that absence. Frame gaps
+and scheduler tick differences other than zero or one are excluded and counted.
+
+Same-frame duplicate lifetime IDs or owner addresses exclude every affected
+request, including an earlier request in that frame. A changed owner address
+for one lifetime is excluded and reported as an error. Frames exceeding the
+recorder's 64-row limit or containing inconsistent scheduler ticks are discarded
+and reported as errors. Malformed rows discard pending history and quarantine
+the next observed frame, because their frame cannot be trusted. An ordering
+regression discards pending history and quarantines the regressed frame.
+These conservative barriers can undercount otherwise usable observations.
+
+For retained pairs, the report separately counts changes in sheet descriptors,
+position, transform, clip, appearance and owner state; categories can overlap.
+Only matching sheet descriptors receive a numeric cel-column classification:
+unchanged, +1, or other, separated by same/next scheduler tick. Sheet descriptors
+include coin family, shell mode, resource name/pointer/generation, row and grid.
+A numeric +1 is not a verified animation advance, and a decrease is not a
+verified wrap. Paused/collected/fading pairs are observations, not blend targets.
+
+Resource continuity remains unverified for **every** pair. Generation zero is
+counted explicitly, and matching nonzero values are also not certified: this
+schema has no implemented pixel-revision or resource-lifetime contract.
+No pairing enables smoothing or changes the game executable.
+
+The standalone analyzer update contains only Python tools, a launcher and this
+guide. Extract it into a separate folder, copy a complete closed-game capture
+there, and run Analyze M2 Logs.cmd with Python 3 installed. Preserve original
+capture files. The previous Windows game release remains the capture build;
+its bundled analyzer predates these transition checks. Missing coin traces in
+older recordings remain explicit rather than becoming zero-motion evidence.
 
 New gameplay recordings and visual acceptance remain outstanding. Compilation
 and synthetic recorder tests do not verify appearance, audio or display pacing.

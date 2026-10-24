@@ -1,9 +1,26 @@
-# M2 engineering handover â€” 24 October 2026
+# M2 engineering handover â€” 25 October 2026
 
 This is the current engineering status. Older appended README sections describe
 historical stages and may contradict later implementations. Keep evidence levels
 separate: source, unit tests, Windows compilation, recorded runtime and visual
 user acceptance are different claims.
+
+## Coin transition diagnostics (October 25)
+
+The analyzer now compares unique silver/gold requests in consecutive rendered
+frames using owner lifetime IDs. It reports numeric cel changes and independent
+sheet, position, transform, clip, appearance and owner-state changes. Bounded
+two-frame storage excludes gaps, duplicate identities, changed owner addresses,
+malformed/order barriers and impossible recorder frames. No image-generation
+value certifies pixel continuity. No game code or blending policy changes.
+See COIN_SPRITE_TRACE.md for the precise counting and exclusion rules.
+Local validation: 85 Python tests passed, including 15 transition tests.
+The standalone Python package passed CRC/source checks and a launcher test
+from another directory with spaces in the package path. Synthetic requests
+produced the expected six pairs; the historical capture still explicitly lacks
+coin telemetry. Both sets of input files remained byte-for-byte unchanged.
+This Python/docs increment requires no game rebuild; it uses the verified
+October 24 capture build. New gameplay and visual evidence is still pending.
 
 ## Coin sprite telemetry increment (October 24)
 
@@ -13,9 +30,12 @@ owner lifetime IDs reset on construction/load. Resource generation remains
 explicitly untracked. See COIN_SPRITE_TRACE.md for capture and evidence limits.
 No coin smoothing is enabled. Original Update, graphics calls and saved fields
 were checked against the prior pinned generated source. Local checks passed:
-70 Python tests and nine native C++ programs. Windows CI/package verification
-and new gameplay capture are separate evidence; no visual acceptance is claimed.
-The workflow targets a fresh m2-coin-sprite-trace-20261024 experimental release.
+70 Python tests and nine native C++ programs. Windows CI 40097480779 passed
+for d85c37fdb9fea0b7d90b0e327a71bc5d39a7e255. The downloaded release passed
+metadata, CRC, x64 executable, launcher and bundled-source verification.
+The release is m2-coin-sprite-trace-20261024; ZIP SHA256:
+0a90d99673e5ab5f2b19ce65e65898fbb82bd62c19702aa655890125b92198f6.
+New gameplay capture and visual acceptance remain outstanding.
 
 ## Baseline and protected branch
 
