@@ -16,3 +16,5 @@ add_executable(M2ObjectInterpolationTest test_object_interpolation.cpp)
 
 add_executable(M2ReleaseSelectorTest test_update_release_selector.cpp)
 add_executable(M2SmokeAnimationTest test_smoke_animation.cpp)
+
+add_executable(M2CoinSpriteTraceTest test_coin_sprite.cpp)

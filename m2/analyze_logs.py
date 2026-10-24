@@ -211,6 +211,12 @@ def analyze(folder: Path):
         report.append("Fish/coin animation counters (numeric observations; sprite state unknown):")
         report.extend("- " + entry for entry in animation_detail)
     notes.extend(animation_notes)
+    from coin_sprite_audit import audit_coin_sprites
+    coin_detail, coin_notes = audit_coin_sprites(folder)
+    if coin_detail:
+        report.append("")
+        report.extend(coin_detail)
+    notes.extend(coin_notes)
     from smoke_animation_audit import audit_smoke_animation
     smoke_detail, smoke_notes = audit_smoke_animation(folder)
     if smoke_detail:

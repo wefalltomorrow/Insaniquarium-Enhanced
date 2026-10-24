@@ -27,6 +27,19 @@ struct ObjectState {
     bool valid = false;
 };
 
+struct CoinSpriteState {
+    const void* object = nullptr;
+    const void* image = nullptr;
+    unsigned long long lifetime = 0;
+    int type = 0, cel = 0, row = 0;
+    int width = 0, height = 0, cols = 0, rows = 0;
+    int x = 0, y = 0, clipX = 0, clipY = 0, clipW = 0, clipH = 0;
+    double transX = 0, transY = 0, scaleX = 1, scaleY = 1, originX = 0, originY = 0;
+    int red = 255, green = 255, blue = 255, alpha = 255, drawMode = 0;
+    bool shell = false, colorized = false, paused = false, collected = false;
+    int disappear = 0;
+};
+
 class Recorder {
     bool active = false, opened = false;
     FILE* frames = nullptr;
@@ -34,6 +47,10 @@ class Recorder {
     FILE* sprites = nullptr;
     FILE* interp = nullptr;
     FILE* motion = nullptr;
+    FILE* coinSprites = nullptr;
+    unsigned long long coinSpriteRows = 0, nextCoinLifetime = 0;
+    unsigned perFrameCoinSprites = 0;
+    bool coinBudgetReported = false, coinFrameBudgetReported = false;
     FILE* animation = nullptr;
     unsigned long long animationRows = 0;
     unsigned perFrameAnimation = 0;
@@ -91,6 +108,7 @@ public:
         if (interp) std::fclose(interp);
         if (motion) std::fclose(motion);
         if (animation) std::fclose(animation);
+        if (coinSprites) std::fclose(coinSprites);
         if (invalidSprites) std::fclose(invalidSprites);
         if (skippedSprites) std::fclose(skippedSprites);
         if (events) std::fclose(events);
@@ -131,6 +149,8 @@ public:
             "frame,gameTick,kind,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend,paused,hasHistory\n");
         animation = Open("M2DebugSmokeAnimation.csv",
             "frame,gameTick,objectId,shotType,simulationAge,simulationCel,fromCel,toCel,mix,transition,paused\n");
+        coinSprites = Open("M2DebugCoinSprites.csv",
+            "frame,gameTick,objectId,lifetimeId,coinType,shellMode,imageId,resource,resourceGeneration,celColumn,celRow,imageWidth,imageHeight,sheetCols,sheetRows,drawX,drawY,translationX,translationY,scaleX,scaleY,scaleOriginX,scaleOriginY,clipX,clipY,clipWidth,clipHeight,mirror,colorized,red,green,blue,alpha,drawMode,paused,collected,disappearTimer\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
             "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         skippedSprites = Open("M2DebugSkippedSprites.csv",
@@ -138,8 +158,42 @@ public:
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !motion || !animation || !invalidSprites || !skippedSprites || !events)
+        if (!frames || !objects || !sprites || !interp || !motion || !animation || !coinSprites || !invalidSprites || !skippedSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
+    }
+
+    // Zero is unknown/disabled. IDs are session-local and never serialized.
+    unsigned long long NewCoinLifetime() {
+        if (!active || nextCoinLifetime == std::numeric_limits<unsigned long long>::max()) return 0;
+        return ++nextCoinLifetime;
+    }
+    void CoinSprite(const CoinSpriteState& s) {
+        if (!active || !coinSprites) return;
+        if (coinSpriteRows >= kTraceRowLimit) {
+            if (!coinBudgetReported) {
+                LogEvent("INFO", "coin_sprite_file_budget_exhausted", coinSpriteRows, 0, false);
+                coinBudgetReported = true;
+            }
+            return;
+        }
+        if (perFrameCoinSprites >= kEffectMotionPerFrame) {
+            if (!coinFrameBudgetReported) {
+                LogEvent("INFO", "coin_sprite_frame_budget_exceeded", perFrameCoinSprites, 0, false);
+                coinFrameBudgetReported = true;
+            }
+            return;
+        }
+        ++coinSpriteRows; ++perFrameCoinSprites;
+        // Generation zero is untracked, even if image pointers match.
+        std::fprintf(coinSprites,
+            "%llu,%llu,%p,%llu,%d,%d,%p,%s,0,%d,%d,%d,%d,%d,%d,%d,%d,"
+            "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%d,%d,%d,%d,0,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+            frame, ticks, s.object, s.lifetime, s.type, s.shell, s.image,
+            s.shell ? "IMAGE_SHELLS" : "IMAGE_MONEY", s.cel, s.row,
+            s.width, s.height, s.cols, s.rows, s.x, s.y,
+            s.transX, s.transY, s.scaleX, s.scaleY, s.originX, s.originY,
+            s.clipX, s.clipY, s.clipW, s.clipH, s.colorized,
+            s.red, s.green, s.blue, s.alpha, s.drawMode, s.paused, s.collected, s.disappear);
     }
 
     void SmokeAnimation(const void* object, int type, int age, int cel,
@@ -356,6 +410,7 @@ public:
         perFrameObjects = perFrameSprites = perFrameMotion = 0;
         perFrameEffectMotion = 0;
         perFrameAnimation = 0;
+        perFrameCoinSprites = 0;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
         if ((frame % 300) == 0) {

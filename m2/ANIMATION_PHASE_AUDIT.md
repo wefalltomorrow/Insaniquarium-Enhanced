@@ -153,7 +153,9 @@ single-cel premultiplied composition only when source pixels are resident and
 the resolved states are compatible. Restore caller graphics state and retain
 an original-draw fallback. Avoid introducing serialized fields.
 
-This descriptor/history policy is a design boundary, not implemented telemetry.
+The initial silver/gold descriptor telemetry is now implemented; see
+COIN_SPRITE_TRACE.md. It deliberately leaves resource generation unknown.
+Blending history and the remaining family policies are still design boundaries.
 New captures must cover turns, feeding/growth/death, shell-mode entry, collection,
 fade, pause and save/load. Visual edge quality, audio and physical presentation
 remain separate tests. Smoke acceptance and a missile encounter are still pending.

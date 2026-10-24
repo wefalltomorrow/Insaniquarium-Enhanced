@@ -5,6 +5,18 @@ historical stages and may contradict later implementations. Keep evidence levels
 separate: source, unit tests, Windows compilation, recorded runtime and visual
 user acceptance are different claims.
 
+## Coin sprite telemetry increment (October 24)
+
+Resolved silver/gold coin draw requests now have a separate debug stream and
+analyzer. This includes shell-mode branches, effective tint, transforms and
+owner lifetime IDs reset on construction/load. Resource generation remains
+explicitly untracked. See COIN_SPRITE_TRACE.md for capture and evidence limits.
+No coin smoothing is enabled. Original Update, graphics calls and saved fields
+were checked against the prior pinned generated source. Local checks passed:
+70 Python tests and nine native C++ programs. Windows CI/package verification
+and new gameplay capture are separate evidence; no visual acceptance is claimed.
+The workflow targets a fresh m2-coin-sprite-trace-20261024 experimental release.
+
 ## Baseline and protected branch
 
 - Stable M1.2 `main`: `39a581e009767dea9e6829912c201f18b125f16d`.
