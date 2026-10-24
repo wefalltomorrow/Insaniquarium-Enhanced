@@ -12,6 +12,7 @@ from pathlib import Path
 import re
 import statistics
 from trace_integrity import audit_traces, audit_object_movement, audit_fish_interpolation, audit_missile_motion, audit_shot_effect_motion
+from trace_integrity import audit_animation_cels
 
 def rows(folder: Path, filename: str):
     path = folder / filename
@@ -204,6 +205,12 @@ def analyze(folder: Path):
         report.append("Shot-effect simulation motion and rendered offsets:")
         report.extend("- " + entry for entry in shot_detail)
     notes.extend(shot_notes)
+    animation_detail, animation_notes = audit_animation_cels(folder)
+    if animation_detail:
+        report.append("")
+        report.append("Fish/coin animation counters (numeric observations; sprite state unknown):")
+        report.extend("- " + entry for entry in animation_detail)
+    notes.extend(animation_notes)
     from smoke_animation_audit import audit_smoke_animation
     smoke_detail, smoke_notes = audit_smoke_animation(folder)
     if smoke_detail:

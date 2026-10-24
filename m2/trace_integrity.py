@@ -19,6 +19,143 @@ TRACE_NAMES = (
     "M2DebugSkippedSprites.csv",
 )
 
+ANIMATION_KINDS = ("fish", "fish_pet", "coin")
+
+
+def inspect_animation_cels(path: Path, history_limit=20000):
+    """Stream numeric cel observations, never infer sprite state or lifetime.
+
+    History is an LRU bounded by history_limit. Malformed records and global
+    frame/tick regressions clear it. Gaps start a new baseline; duplicate draws
+    do not count as tick transitions. Pointer reuse without a gap is inherently
+    undetectable in this schema. No image/cel-row joins are attempted.
+    """
+    if history_limit < 1:
+        raise ValueError("history_limit must be positive")
+    stats = {kind: collections.Counter() for kind in ANIMATION_KINDS}
+    issues = collections.Counter()
+    previous = collections.OrderedDict()
+    last = None
+    required = ("frame", "gameTick", "kind", "objectId", "animationCel")
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            reader = csv.reader(source, strict=True)
+            header = next(reader, [])
+            if len(header) != len(set(header)) or not set(required).issubset(header):
+                issues["incompatible_header"] += 1
+                return stats, issues
+            columns = {name: header.index(name) for name in required}
+            for row in reader:
+                issues["rows_read"] += 1
+                try:
+                    if len(row) != len(header):
+                        raise ValueError()
+                    frame, tick = int(row[columns["frame"]]), int(row[columns["gameTick"]])
+                    kind, object_id = row[columns["kind"]], row[columns["objectId"]]
+                    if frame < 0 or tick < 0 or not kind.strip() or not object_id.strip():
+                        raise ValueError()
+                    cel = int(row[columns["animationCel"]]) if kind in stats else 0
+                    if cel < 0:
+                        raise ValueError()
+                except (ValueError, TypeError):
+                    issues["malformed_rows"] += 1
+                    previous.clear()
+                    last = None
+                    continue
+                if last and (frame < last[0] or tick < last[1]):
+                    issues["order_resets"] += 1
+                    previous.clear()
+                last = (frame, tick)
+                if kind not in stats:
+                    continue
+                count = stats[kind]
+                count["samples"] += 1
+                key = (kind, object_id)
+                old = previous.pop(key, None)
+                if old is None:
+                    count["baselines"] += 1
+                else:
+                    df, dt, dc = frame - old[0], tick - old[1], cel - old[2]
+                    if df == 0:
+                        if dt == 0 and dc == 0:
+                            count["duplicate_samples"] += 1
+                            previous[key] = old
+                        else:
+                            count["same_frame_conflicts"] += 1
+                        continue
+                    if df > 1:
+                        count["nonconsecutive_frame_pairs"] += 1
+                    if dt == 0:
+                        count["same_tick_changed" if dc else "same_tick_unchanged"] += 1
+                        if dc:
+                            # No trustworthy state/lifetime boundary: start fresh next time.
+                            continue
+                    elif dt == 1:
+                        count["adjacent_ticks"] += 1
+                        category = {0: "unchanged", 1: "plus_one", -1: "minus_one"}.get(dc, "other_change")
+                        count[category] += 1
+                    else:
+                        count["tick_gaps"] += 1
+                        count["unobserved_ticks"] += dt - 1
+                if len(previous) >= history_limit:
+                    previous.popitem(last=False)
+                    issues["history_evictions"] += 1
+                previous[key] = (frame, tick, cel)
+    except (OSError, UnicodeError, csv.Error):
+        # Partial observations remain reportable, but are never a clean pass.
+        issues["read_errors"] += 1
+    return stats, issues
+
+
+def audit_animation_cels(folder: Path):
+    """Summarize recorded counters, without certifying animation or smoothing.
+
+    The source counter need not be the cel actually drawn (e.g. static coins).
+    Even adjacent ticks with a +1 difference do not establish blend eligibility.
+    """
+    path = folder / "M2DebugObjects.csv"
+    if not path.is_file():
+        return [], ["INFO: Animation counters not captured; M2DebugObjects.csv is missing."]
+    stats, issues = inspect_animation_cels(path)
+    lines, notes = [], []
+    for kind, count in stats.items():
+        if not count["samples"]:
+            notes.append(f"INFO: No usable {kind} animation-counter samples.")
+            continue
+        lines.append(
+            f"{kind}: {count['samples']:,} samples; {count['baselines']:,} baselines; "
+            f"{count['adjacent_ticks']:,} adjacent-tick pairs: "
+            f"{count['unchanged']:,} unchanged, {count['plus_one']:,} +1, "
+            f"{count['minus_one']:,} -1, {count['other_change']:,} other numeric changes.")
+        lines.append(
+            f"{kind}: same-tick redraws {count['same_tick_unchanged']:,} unchanged / "
+            f"{count['same_tick_changed']:,} changed; {count['duplicate_samples']:,} duplicates; "
+            f"{count['same_frame_conflicts']:,} same-frame conflicts; "
+            f"{count['tick_gaps']:,} tick gaps ({count['unobserved_ticks']:,} unobserved ticks "
+            f"summed per ID); {count['nonconsecutive_frame_pairs']:,} pairs skip render frames.")
+        if count["same_tick_changed"] or count["same_frame_conflicts"]:
+            notes.append(f"WARN: {kind} counters differ within a tick/frame; history was reset. "
+                         "Possible identity reuse, mixed capture or state mutation; not automatically a gameplay bug.")
+        if count["tick_gaps"]:
+            notes.append(f"INFO: {kind} tick gaps were excluded from adjacent-tick counts; "
+                         "sampling, missing objects or reused addresses can cause gaps.")
+    for name, description in (
+        ("incompatible_header", "incompatible/duplicate CSV headers"),
+        ("malformed_rows", "malformed rows (all history cleared)"),
+        ("order_resets", "frame/tick regressions (all history cleared)"),
+        ("read_errors", "CSV read/encoding errors (results may be partial)"),
+        ("history_evictions", "bounded-history evictions (later observations start new baselines)"),
+    ):
+        if issues[name]:
+            notes.append(f"WARN: Animation counter audit: {issues[name]:,} {description}.")
+    notes.append(
+        "INFO: Animation counter observations cannot identify sprite state, sheet, row, mirror, "
+        "draw mode, pause or object lifetime. Pointer IDs may be reused even on adjacent ticks. "
+        "Numeric changes are not verified wraps, state transitions or safe-to-blend pairs; "
+        "unchanged counters do not prove unchanged appearance. Sprite CSV rows cannot be reliably "
+        "joined to these objects. Visual quality and display frame pacing remain unverified.")
+    return lines, notes
+
 def inspect_trace(path: Path):
     """Return (row_count, last_frame, problems) without storing CSV rows."""
     problems = []

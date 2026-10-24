@@ -16,9 +16,10 @@ user acceptance are different claims.
 - Published October 23 smoke baseline: m2-smoke-animation-20261023,
   commit 59bdb74cde9f455f3e360b72938c43c0983bf742, successful CI 39937822570.
   ZIP SHA256: 9026c074ea3a9c7722cc6eb1b9d03bcdbde13e0d7e88166d2e37f02ddbc22e2f.
-- October 24 continuation prepares m2-smoke-pixels-20261024. Treat it as
-  published only after CI and the asset are verified. BUILD_INFO.json records
-  source/run/tag and smoke_compositing=premultiplied-pixels-v1.
+- October 24 verified release: `m2-smoke-pixels-guard-20261024`, commit
+  `9cd1dff14895f030528cf95d97fb84e699ad623c`, successful CI `40091120645`.
+  This supersedes the intermediate `m2-smoke-pixels-20261024` release.
+  BUILD_INFO.json records source/run/tag and premultiplied pixel composition.
 - Pinned native port: `95d4aafe408b36e8a195982ad7acbae5fb6a0b33`;
   WinFish: `f919b3c241cfd611c547f1653fb3514f500f761b`;
   PopLib gitlink: `45776cefdeb8cd5bd43ce7f345aa7be1807c7380`.
@@ -173,6 +174,28 @@ and Sync functions are byte-identical to the previous patched source after
 newline normalization. Full Windows build verification follows in CI.
 No new user recording was supplied; smoke visual acceptance remains pending.
 
+## October 24 fish/coin diagnostic continuation
+
+The guarded smoke release is verified: `m2-smoke-pixels-guard-20261024`,
+commit `9cd1dff14895f030528cf95d97fb84e699ad623c`, successful CI `40091120645`.
+ZIP SHA256: `1f4d401726982c3b3e6144df61e1943f106d43d8396de80d79f355c8b9260192`.
+It supersedes the intermediate unguarded pixel build.
+
+The next increment changes only Python diagnostics, tests and documentation.
+See [fish/coin phase audit](ANIMATION_PHASE_AUDIT.md) for pinned source anchors,
+counter formulas, draw-state exclusions and the proposed future history policy.
+The analyzer now separates adjacent-tick numeric differences from gaps,
+duplicates and same-tick inconsistencies. Existing logs cannot identify actual
+sprite state or lifetime; numeric transitions are not blend approval.
+
+All 63 Python tests pass locally. Reprocessed the archived October 13 capture:
+31,495 fish, 10,082 fish-pet and 1,443 coin adjacent-tick counter pairs, with
+substantial sampling gaps. No new gameplay recording or visual acceptance.
+A standalone analyzer is delivered; the verified game binary is unchanged.
+Use `[skip ci]` for this diagnostics-only commit to avoid rerunning the binary
+release workflow against its already published immutable tag. No workflow or
+stable-branch changes; future runtime work still requires full Windows CI.
+
 ## Next work
 
 1. Compare optional smoke animation visually; retain or revise based on opacity
@@ -181,8 +204,10 @@ No new user recording was supplied; smoke visual acceptance remains pending.
    target/collision timing, effects and sound. Do not confuse pre-patch missile
    motion samples with proof of interpolated drawing.
 3. Confirm Check Updates UI on the released tag.
-4. Audit fish/coin animation phase transitions independently, including direction,
-   wrap, feeding/death and additive compositing before expanding interpolation.
+4. Implement resolved draw-state telemetry for a narrow coin candidate using
+   ANIMATION_PHASE_AUDIT.md; capture lifetime, sheet/row, mode, mirror and opacity
+   before expanding interpolation. Source audit and counter analysis are done;
+   family-specific blend policies and runtime evidence remain outstanding.
 5. Exercise Adventure, Time Trial, Challenge, Virtual Tank, save/load, focus,
    purchases, feeding, transitions, audio and long sessions. Internal logs do not
    certify every mode or physical display frame pacing.
