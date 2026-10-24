@@ -31,6 +31,7 @@ struct CoinSpriteState {
     const void* object = nullptr;
     const void* image = nullptr;
     unsigned long long lifetime = 0;
+    unsigned long long imageLifetime = 0, reportedPixelRevision = 0;
     int type = 0, cel = 0, row = 0;
     int width = 0, height = 0, cols = 0, rows = 0;
     int x = 0, y = 0, clipX = 0, clipY = 0, clipW = 0, clipH = 0;
@@ -150,7 +151,7 @@ public:
         animation = Open("M2DebugSmokeAnimation.csv",
             "frame,gameTick,objectId,shotType,simulationAge,simulationCel,fromCel,toCel,mix,transition,paused\n");
         coinSprites = Open("M2DebugCoinSprites.csv",
-            "frame,gameTick,objectId,lifetimeId,coinType,shellMode,imageId,resource,resourceGeneration,celColumn,celRow,imageWidth,imageHeight,sheetCols,sheetRows,drawX,drawY,translationX,translationY,scaleX,scaleY,scaleOriginX,scaleOriginY,clipX,clipY,clipWidth,clipHeight,mirror,colorized,red,green,blue,alpha,drawMode,paused,collected,disappearTimer\n");
+            "frame,gameTick,objectId,lifetimeId,coinType,shellMode,imageId,resource,resourceGeneration,celColumn,celRow,imageWidth,imageHeight,sheetCols,sheetRows,drawX,drawY,translationX,translationY,scaleX,scaleY,scaleOriginX,scaleOriginY,clipX,clipY,clipWidth,clipHeight,mirror,colorized,red,green,blue,alpha,drawMode,paused,collected,disappearTimer,imageLifetimeId,reportedPixelRevision\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
             "frame,gameTick,imageId,assetPath,imageWidth,imageHeight,sheetCols,sheetRows,requestedCol,requestedRow,drawX,drawY\n");
         skippedSprites = Open("M2DebugSkippedSprites.csv",
@@ -187,13 +188,14 @@ public:
         // Generation zero is untracked, even if image pointers match.
         std::fprintf(coinSprites,
             "%llu,%llu,%p,%llu,%d,%d,%p,%s,0,%d,%d,%d,%d,%d,%d,%d,%d,"
-            "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%d,%d,%d,%d,0,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+            "%.9g,%.9g,%.9g,%.9g,%.9g,%.9g,%d,%d,%d,%d,0,%d,%d,%d,%d,%d,%d,%d,%d,%d,%llu,%llu\n",
             frame, ticks, s.object, s.lifetime, s.type, s.shell, s.image,
             s.shell ? "IMAGE_SHELLS" : "IMAGE_MONEY", s.cel, s.row,
             s.width, s.height, s.cols, s.rows, s.x, s.y,
             s.transX, s.transY, s.scaleX, s.scaleY, s.originX, s.originY,
             s.clipX, s.clipY, s.clipW, s.clipH, s.colorized,
-            s.red, s.green, s.blue, s.alpha, s.drawMode, s.paused, s.collected, s.disappear);
+            s.red, s.green, s.blue, s.alpha, s.drawMode, s.paused, s.collected, s.disappear,
+            s.imageLifetime, s.reportedPixelRevision);
     }
 
     void SmokeAnimation(const void* object, int type, int age, int cel,

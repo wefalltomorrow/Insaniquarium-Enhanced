@@ -1,4 +1,5 @@
 #include "../CoinSpriteTrace.hpp"
+#include "../ImageIdentity.hpp"
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -12,7 +13,10 @@ static void Enable(bool enabled) {
     setenv("INSANIQUARIUM_M2_DEBUG", enabled ? "1" : "0", 1);
 #endif
 }
-struct Image { int mWidth=720, mHeight=360, mNumCols=10, mNumRows=5; };
+struct Image {
+    EnhancedM2::ImageIdentity mM2ImageIdentity;
+    int mWidth=720, mHeight=360, mNumCols=10, mNumRows=5;
+};
 struct Rect { int mX=1, mY=2, mWidth=640, mHeight=480; };
 struct Color { int mRed=17, mGreen=34, mBlue=51, mAlpha=102; };
 struct Graphics {
@@ -55,16 +59,22 @@ int main() {
         r.End(1,true,true,16,1,0);
         r.Begin(16,0,0);
         g.colorized=true;
+        im.mM2ImageIdentity.BitsChanged();
         M2Debug::RecordCoinSprite(r,&g,&im,&im,second,9,true,3,1,20,20,true,true,2);
         Check(g.color.mAlpha==102 && g.mTransX==120.5f && g.colorized);
         r.End(0,true,true,16,1,0);
     }
     std::ifstream in("M2DebugCoinSprites.csv"); std::string line;
-    Check(bool(std::getline(in,line))); auto header=Fields(line); Check(header.size()==37);
+    Check(bool(std::getline(in,line))); auto header=Fields(line); Check(header.size()==39);
+    Check(header[37]=="imageLifetimeId" && header[38]=="reportedPixelRevision");
+    std::string imageLifetime;
     int rows=0;
     while (std::getline(in,line)) {
         auto f=Fields(line); Check(f.size()==header.size()); ++rows;
         Check(f[8]=="0" && f[27]=="0");
+        Check(f[37]!="0" && f[38]==(rows==65 ? "2" : "1"));
+        if (rows==1) imageLifetime=f[37];
+        Check(f[37]==imageLifetime);
         Check(f[17]=="120.5" && f[18]=="-0.25" && f[19]=="1.5");
         if (rows==1) Check(f[3]=="1" && f[7]=="IMAGE_MONEY" && f[29]=="255" && f[32]=="255");
         if (rows==65) Check(f[0]=="1" && f[1]=="1" && f[3]=="2" &&

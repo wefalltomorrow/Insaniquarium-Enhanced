@@ -12,6 +12,8 @@ void RecordCoinSprite(Recorder& recorder, Graphics* g, Image* image,
     CoinSpriteState s;
     s.object = owner; s.lifetime = lifetime; s.type = type;
     s.shell = shell; s.image = image; s.cel = cel; s.row = row;
+    s.imageLifetime = image->mM2ImageIdentity.Lifetime();
+    s.reportedPixelRevision = image->mM2ImageIdentity.ReportedRevision();
     s.width = image->mWidth; s.height = image->mHeight;
     s.cols = image->mNumCols; s.rows = image->mNumRows;
     s.x = x; s.y = y;

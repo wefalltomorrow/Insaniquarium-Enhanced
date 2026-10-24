@@ -34,8 +34,39 @@ No gameplay callback, RNG, counter or movement is invoked by the recorder.
 
 Resource names identify the selected IMAGE_MONEY or IMAGE_SHELLS branch;
 imageId is only the current pointer. resourceGeneration is always zero, meaning
-**untracked**. Same-address resource replacement or in-place pixel changes are
-not detectable. This trace does not establish blending eligibility.
+full pixel continuity is **untracked**. The v2 stamps below separately identify
+image lifetimes and explicit pixel-change notifications. This trace does not
+establish blending eligibility.
+
+## Image stamps (v2) - October 25, 2026
+
+The CSV appends imageLifetimeId and reportedPixelRevision, for 39 columns.
+The analyzer still accepts the original 37-column v1 format and explicitly
+reports its missing stamps as unknown. IDs cannot be compared across processes.
+
+imageLifetimeId is fresh on construction, copying, moving and non-self
+assignment. Reconstructing an image at the same address produces a different
+ID. Assignment creates a new observation identity even if the allocation stays
+in place; self-assignment preserves it. The base Image member also covers
+MemoryImage and SDLImage, including their explicit copy constructors. The global
+allocator is thread-safe; per-image mutation follows existing ownership rules.
+If the 64-bit ID space is exhausted, subsequent IDs remain zero (unknown).
+
+reportedPixelRevision starts at one and increments only when the existing
+MemoryImage::BitsChanged method is called. Overflow permanently produces zero
+(unknown) for that identity. Raw writes through public mBits/GetBits can bypass
+this notification. Matching stamps do not certify unchanged pixels, texture
+residency, renderer state, purge/recovery behavior or safe blending.
+
+The hook adds no missing BitsChanged calls, reads no pixels, performs no texture
+recovery and leaves original pixel operations and the old signed counter intact.
+For example, pinned BonusScreen.cpp writes shell-image alpha pixels directly
+without a following notification. This demonstrates a framework limitation;
+it is not evidence that the recorded coin sheet changed during a capture.
+
+Changed image IDs or reported revisions exclude numeric cel comparisons. A
+known ID with a changed address or decreasing nonzero revision is an error and
+that pair is excluded. Unknown stamps remain explicitly observational.
 
 ## Geometry and state
 
@@ -100,7 +131,7 @@ These conservative barriers can undercount otherwise usable observations.
 
 For retained pairs, the report separately counts changes in sheet descriptors,
 position, transform, clip, appearance and owner state; categories can overlap.
-Only matching sheet descriptors receive a numeric cel-column classification:
+Only matching sheet descriptors and recorded image stamps receive a numeric cel-column classification:
 unchanged, +1, or other, separated by same/next scheduler tick. Sheet descriptors
 include coin family, shell mode, resource name/pointer/generation, row and grid.
 A numeric +1 is not a verified animation advance, and a decrease is not a
@@ -108,15 +139,19 @@ verified wrap. Paused/collected/fading pairs are observations, not blend targets
 
 Resource continuity remains unverified for **every** pair. Generation zero is
 counted explicitly, and matching nonzero values are also not certified: this
-schema has no implemented pixel-revision or resource-lifetime contract.
-No pairing enables smoothing or changes the game executable.
+the v2 lifetime and notification contract does not cover every pixel mutation.
+No pairing enables smoothing.
 
-The standalone analyzer update contains only Python tools, a launcher and this
-guide. Extract it into a separate folder, copy a complete closed-game capture
-there, and run Analyze M2 Logs.cmd with Python 3 installed. Preserve original
-capture files. The previous Windows game release remains the capture build;
-its bundled analyzer predates these transition checks. Missing coin traces in
-older recordings remain explicit rather than becoming zero-motion evidence.
+The earlier standalone transition analyzer contains only Python tools, a
+launcher and this guide. The new m2-image-lifetime-20261025 game package records
+v2 stamps and bundles the transition analyzer. Preserve original capture files.
+Missing coin traces in older recordings remain explicit rather than becoming
+zero-motion evidence.
+
+For the image-stamp increment, 94 Python tests and ten native C++ programs
+passed locally, including same-address reconstruction, copies, assignment,
+concurrent ID allocation, exhaustion and v1/v2 parsing. Full Windows build and
+downloaded-package results are recorded separately after publication.
 
 New gameplay recordings and visual acceptance remain outstanding. Compilation
 and synthetic recorder tests do not verify appearance, audio or display pacing.

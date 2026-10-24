@@ -6,7 +6,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from apply_coin_sprite_trace import patch
-from coin_sprite_audit import FIELDS, audit_coin_sprites
+from coin_sprite_audit import FIELDS, FIELDS_V2, audit_coin_sprites
 
 HEADER = '\t\tCoin();'
 SOURCE = ('#include "Coin.h"\nPopLib::Coin::Coin()\n{}\n'
@@ -79,5 +79,32 @@ class AuditTests(unittest.TestCase):
     def test_header_rejected(self):
         self.write([],['frame','gameTick'])
         self.assertIn('unsupported header',audit_coin_sprites(self.folder)[1][0])
+
+    def test_v2_stamps_and_legacy_unknowns(self):
+        self.write([self.row])
+        self.assertIn('v1 (not recorded)', '\n'.join(audit_coin_sprites(self.folder)[0]))
+        modern = dict(self.row, imageLifetimeId='10', reportedPixelRevision='1')
+        self.write([modern], FIELDS_V2)
+        report, notes = audit_coin_sprites(self.folder)
+        self.assertFalse(notes)
+        self.assertIn('v2; unknown image lifetimes 0, unknown reported pixel revisions 0', '\n'.join(report))
+
+    def test_v2_invalid_stamps(self):
+        for field in ('imageLifetimeId', 'reportedPixelRevision'):
+            for value in ('-1', str(2**64), 'nan', ''):
+                modern = dict(self.row, imageLifetimeId='10', reportedPixelRevision='1')
+                modern[field] = value
+                self.write([modern], FIELDS_V2)
+                self.assertIn('1 invalid', '\n'.join(audit_coin_sprites(self.folder)[0]))
+
+    def test_v2_exhausted_stamps_remain_unknown(self):
+        self.write([dict(self.row, imageLifetimeId='0', reportedPixelRevision='0')], FIELDS_V2)
+        report, notes = audit_coin_sprites(self.folder)
+        self.assertFalse(notes)
+        self.assertIn('unknown image lifetimes 1, unknown reported pixel revisions 1', '\n'.join(report))
+
+    def test_partial_v2_header_rejected(self):
+        self.write([], FIELDS + ['imageLifetimeId'])
+        self.assertIn('unsupported header', audit_coin_sprites(self.folder)[1][0])
 
 if __name__=='__main__': unittest.main()

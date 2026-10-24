@@ -130,6 +130,29 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(tracker.finish(), tracker.finish())
         self.assertEqual(tracker.counts['pairs'], 1)
 
+    def test_image_address_reuse_is_detected_by_new_lifetime(self):
+        counts, _, notes = audit([row(imageLifetimeId=10, reportedPixelRevision=1),
+                                  row(1, 1, imageLifetimeId=11, reportedPixelRevision=1, celColumn=1)])
+        self.assertFalse(notes)
+        self.assertEqual(counts['image_identity_changes'], 1)
+        self.assertEqual(counts['cel_1_plus_one'], 0)
+        self.assertEqual(counts['unknown_image_lifetime_pairs'], 0)
+
+    def test_reported_pixel_mutation_excludes_cel_pairing(self):
+        counts, _, notes = audit([row(imageLifetimeId=10, reportedPixelRevision=1),
+                                  row(1, 1, imageLifetimeId=10, reportedPixelRevision=2, celColumn=1)])
+        self.assertFalse(notes)
+        self.assertEqual(counts['reported_pixels_changes'], 1)
+        self.assertEqual(counts['cel_1_plus_one'], 0)
+
+    def test_conflicting_image_stamps_fail_closed(self):
+        for changes in ({'imageId': '0x200'}, {'reportedPixelRevision': 1}):
+            counts, _, notes = audit([row(imageLifetimeId=10, reportedPixelRevision=2),
+                row(1, 1, imageLifetimeId=10, reportedPixelRevision=2) | changes])
+            self.assertEqual(counts['pairs'], 0)
+            self.assertEqual(counts['inconsistent_image_pairs'], 1)
+            self.assertTrue(notes[0].startswith('ERROR:'))
+
     def test_invalid_and_regressed_csv_rows_break_history(self):
         for bad, expected_pairs in ((dict(row(), alpha='nan'), 1), (row(-1), 1),
                                     (row(0), 2)):

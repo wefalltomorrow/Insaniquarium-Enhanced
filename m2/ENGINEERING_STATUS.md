@@ -236,11 +236,37 @@ stable-branch changes; future runtime work still requires full Windows CI.
    target/collision timing, effects and sound. Do not confuse pre-patch missile
    motion samples with proof of interpolated drawing.
 3. Confirm Check Updates UI on the released tag.
-4. Implement resolved draw-state telemetry for a narrow coin candidate using
-   ANIMATION_PHASE_AUDIT.md; capture lifetime, sheet/row, mode, mirror and opacity
-   before expanding interpolation. Source audit and counter analysis are done;
-   family-specific blend policies and runtime evidence remain outstanding.
+4. Capture resolved silver/gold coin requests with the new image stamps.
+   Owner lifetime, sheet/row, mode, tint and image lifetime telemetry are now
+   implemented. Family-specific blend policies and runtime evidence remain
+   outstanding; notification revisions do not prove pixel continuity.
 5. Exercise Adventure, Time Trial, Challenge, Virtual Tank, save/load, focus,
    purchases, feeding, transitions, audio and long sessions. Internal logs do not
    certify every mode or physical display frame pacing.
 6. Native 4K, widescreen layout and antialiasing remain separate later objectives.
+
+## October 25 image lifetime diagnostics
+
+The v2 coin recorder adds process-local image identity and explicit BitsChanged
+notification revisions. Construction/copy/non-self assignment refreshes identity;
+same-address reconstruction is distinguishable. An atomic allocator never reuses
+IDs; exhaustion returns unknown. Revisions also saturate to unknown on overflow.
+There is no retained-resource registry, new serialized field or gameplay change.
+
+The pinned Image base and MemoryImage notification hook are patched with exact,
+single-use anchors. Explicit framework copy constructors default-construct the
+new identity; existing pixel operations are preserved. Public raw pixel access
+can bypass notifications: BonusScreen.cpp's shell-image alpha loop is a concrete
+example. SDL renderer writes and recovery are not certified by these stamps.
+resourceGeneration remains zero; unchanged stamps never authorize blending.
+
+The analyzer accepts v1/v2, reports missing stamps, excludes changed stamps from
+numeric cel comparisons, and rejects contradictory same-lifetime addresses or
+decreasing nonzero revisions. Bounded two-frame history and previous barriers
+remain intact. No coin animation crossfade is enabled; smoke stays opt-in.
+
+Local validation: 94 Python tests and ten native C++ programs passed. Coverage
+includes copy/move/assignment, address reuse, concurrent allocation, overflow,
+schema compatibility and changed-stamp exclusions. Full Windows CI and package
+verification follow on the immutable m2-image-lifetime-20261025 tag. Compilation
+and synthetic tests are not gameplay, visual, audio or display pacing evidence.
