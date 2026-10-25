@@ -24,7 +24,15 @@ COIN_ANIMATION_TEST.md for test steps and the CPU/GPU continuity limits.
 Local validation: 101 Python tests and 11 native C++ programs passed. Removing
 the marked additions and restoring the two original draws recovers every
 original nonblank Coin.cpp line; the resource change is only the conditional
-pixel retention and include. Full Windows CI and release verification follow.
+pixel retention and include. Windows CI 40151093961 passed for runtime commit
+888e91211203947dc863f18aa0afec6384c16aba. The independently downloaded
+19-file release passed CRC, x64 executable, build metadata, six-launcher and
+eight bundled-source checks. The shipped analyzer passed historical, v1/v2
+and mixed synthetic coin composition fixtures when launched from another
+directory with spaces in the package path. All original input hashes match.
+Release: m2-coin-blend-20261025. ZIP SHA256:
+bc9e98d0e51c3eba029d588b53a270c2f0fa7b0e616d0e6f65f12780296919f6.
+Stable main remains 39a581e009767dea9e6829912c201f18b125f16d.
 No new gameplay recording or visual acceptance evidence is available.
 
 ## Coin transition diagnostics (October 25)
