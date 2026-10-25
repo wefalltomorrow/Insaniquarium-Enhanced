@@ -267,6 +267,15 @@ remain intact. No coin animation crossfade is enabled; smoke stays opt-in.
 
 Local validation: 94 Python tests and ten native C++ programs passed. Coverage
 includes copy/move/assignment, address reuse, concurrent allocation, overflow,
-schema compatibility and changed-stamp exclusions. Full Windows CI and package
-verification follow on the immutable m2-image-lifetime-20261025 tag. Compilation
-and synthetic tests are not gameplay, visual, audio or display pacing evidence.
+schema compatibility and changed-stamp exclusions. Windows CI 40107229558 passed
+the same tests and compiled the full game at
+44be31993d81bf9a3f0d8220c566a3c5b01aa083, published as the immutable
+m2-image-lifetime-20261025 tag. Downloaded ZIP SHA256:
+9857f69731a774a297e852cc0e7b10af001e264f16a9f2895dc57df9282d81cb.
+The 15-file package passed CRCs, metadata, x64 executable, updater-tag and all
+four launcher-default checks. Its analyzer launcher passed from another working
+directory with spaces in the package path, including historical logs, v1/v2
+native fixtures and synthetic image-change exclusions. Capture hashes stayed
+unchanged. This post-release documentation update does not replace the ZIP.
+Compilation and synthetic tests are not gameplay, visual, audio or display pacing
+evidence; new capture and visual acceptance remain outstanding.

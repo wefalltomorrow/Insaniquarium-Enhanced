@@ -131,14 +131,15 @@ These conservative barriers can undercount otherwise usable observations.
 
 For retained pairs, the report separately counts changes in sheet descriptors,
 position, transform, clip, appearance and owner state; categories can overlap.
-Only matching sheet descriptors and recorded image stamps receive a numeric cel-column classification:
+Only matching sheet descriptors and recorded image stamps receive a numeric
+cel-column classification (unknown stamps are allowed):
 unchanged, +1, or other, separated by same/next scheduler tick. Sheet descriptors
 include coin family, shell mode, resource name/pointer/generation, row and grid.
 A numeric +1 is not a verified animation advance, and a decrease is not a
 verified wrap. Paused/collected/fading pairs are observations, not blend targets.
 
 Resource continuity remains unverified for **every** pair. Generation zero is
-counted explicitly, and matching nonzero values are also not certified: this
+counted explicitly, and matching nonzero values are also not certified:
 the v2 lifetime and notification contract does not cover every pixel mutation.
 No pairing enables smoothing.
 
@@ -149,9 +150,15 @@ Missing coin traces in older recordings remain explicit rather than becoming
 zero-motion evidence.
 
 For the image-stamp increment, 94 Python tests and ten native C++ programs
-passed locally, including same-address reconstruction, copies, assignment,
-concurrent ID allocation, exhaustion and v1/v2 parsing. Full Windows build and
-downloaded-package results are recorded separately after publication.
+passed locally and in Windows CI, including same-address reconstruction, copies,
+assignment, concurrent ID allocation, exhaustion and v1/v2 parsing. CI run
+40107229558 compiled the full game at commit
+44be31993d81bf9a3f0d8220c566a3c5b01aa083. The downloaded release passed CRC,
+inventory, x64 executable, metadata, updater tag and launcher-setting checks.
+Its bundled analyzer launcher passed historical, v1/v2 and synthetic image-change
+fixtures from another working directory with spaces in the package path.
+Original capture hashes remained unchanged. Release ZIP SHA256:
+9857f69731a774a297e852cc0e7b10af001e264f16a9f2895dc57df9282d81cb.
 
 New gameplay recordings and visual acceptance remain outstanding. Compilation
 and synthetic recorder tests do not verify appearance, audio or display pacing.
