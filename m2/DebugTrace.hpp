@@ -49,6 +49,10 @@ class Recorder {
     FILE* interp = nullptr;
     FILE* motion = nullptr;
     FILE* coinSprites = nullptr;
+    FILE* coinBlend = nullptr;
+    unsigned long long coinBlendRows = 0;
+    unsigned perFrameCoinBlend = 0;
+    bool coinBlendBudgetReported = false, coinBlendFrameReported = false;
     unsigned long long coinSpriteRows = 0, nextCoinLifetime = 0;
     unsigned perFrameCoinSprites = 0;
     bool coinBudgetReported = false, coinFrameBudgetReported = false;
@@ -110,6 +114,7 @@ public:
         if (motion) std::fclose(motion);
         if (animation) std::fclose(animation);
         if (coinSprites) std::fclose(coinSprites);
+        if (coinBlend) std::fclose(coinBlend);
         if (invalidSprites) std::fclose(invalidSprites);
         if (skippedSprites) std::fclose(skippedSprites);
         if (events) std::fclose(events);
@@ -150,6 +155,8 @@ public:
             "frame,gameTick,kind,objectId,simulationX,simulationY,renderX,renderY,offsetX,offsetY,blend,paused,hasHistory\n");
         animation = Open("M2DebugSmokeAnimation.csv",
             "frame,gameTick,objectId,shotType,simulationAge,simulationCel,fromCel,toCel,mix,transition,paused\n");
+        coinBlend = Open("M2DebugCoinBlend.csv",
+            "frame,gameTick,objectId,lifetimeId,timer,simulationCel,fromCel,toCel,mix,result\n");
         coinSprites = Open("M2DebugCoinSprites.csv",
             "frame,gameTick,objectId,lifetimeId,coinType,shellMode,imageId,resource,resourceGeneration,celColumn,celRow,imageWidth,imageHeight,sheetCols,sheetRows,drawX,drawY,translationX,translationY,scaleX,scaleY,scaleOriginX,scaleOriginY,clipX,clipY,clipWidth,clipHeight,mirror,colorized,red,green,blue,alpha,drawMode,paused,collected,disappearTimer,imageLifetimeId,reportedPixelRevision\n");
         invalidSprites = Open("M2DebugInvalidSprites.csv",
@@ -159,7 +166,7 @@ public:
         events = Open("M2DebugEvents.csv",
             "frame,gameTick,severity,event,valueA,valueB\n");
         LogEvent("INFO", "debug_enabled", 0, 0, false);
-        if (!frames || !objects || !sprites || !interp || !motion || !animation || !coinSprites || !invalidSprites || !skippedSprites || !events)
+        if (!frames || !objects || !sprites || !interp || !motion || !animation || !coinSprites || !coinBlend || !invalidSprites || !skippedSprites || !events)
             LogEvent("ERROR", "unable_to_open_some_debug_logs");
     }
 
@@ -196,6 +203,28 @@ public:
             s.clipX, s.clipY, s.clipW, s.clipH, s.colorized,
             s.red, s.green, s.blue, s.alpha, s.drawMode, s.paused, s.collected, s.disappear,
             s.imageLifetime, s.reportedPixelRevision);
+    }
+
+    void CoinBlend(const void* object, unsigned long long lifetime, int timer, int cel,
+                   int from, int to, double mix, const char* result) {
+        if (!active || !coinBlend) return;
+        if (coinBlendRows >= kTraceRowLimit) {
+            if (!coinBlendBudgetReported) {
+                LogEvent("INFO", "coin_blend_file_budget_exhausted", coinBlendRows, 0, false);
+                coinBlendBudgetReported = true;
+            }
+            return;
+        }
+        if (perFrameCoinBlend >= kEffectMotionPerFrame) {
+            if (!coinBlendFrameReported) {
+                LogEvent("INFO", "coin_blend_frame_budget_exceeded", perFrameCoinBlend, 0, false);
+                coinBlendFrameReported = true;
+            }
+            return;
+        }
+        ++coinBlendRows; ++perFrameCoinBlend;
+        std::fprintf(coinBlend, "%llu,%llu,%p,%llu,%d,%d,%d,%d,%.6f,%s\n",
+                     frame, ticks, object, lifetime, timer, cel, from, to, mix, result);
     }
 
     void SmokeAnimation(const void* object, int type, int age, int cel,
@@ -413,6 +442,8 @@ public:
         perFrameEffectMotion = 0;
         perFrameAnimation = 0;
         perFrameCoinSprites = 0;
+        perFrameCoinBlend = 0;
+        coinBlendFrameReported = false;
         lastSecondWarnings += currentWarnings;
         currentWarnings = 0;
         if ((frame % 300) == 0) {
@@ -422,6 +453,7 @@ public:
             if (interp) std::fflush(interp);
             if (motion) std::fflush(motion);
             if (animation) std::fflush(animation);
+            if (coinBlend) std::fflush(coinBlend);
             if (invalidSprites) std::fflush(invalidSprites);
             if (skippedSprites) std::fflush(skippedSprites);
             if (events) std::fflush(events);

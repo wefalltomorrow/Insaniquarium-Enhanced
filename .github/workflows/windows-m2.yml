@@ -25,8 +25,8 @@ jobs:
       PORT_COMMIT: 95d4aafe408b36e8a195982ad7acbae5fb6a0b33
       WINFISH_COMMIT: f919b3c241cfd611c547f1653fb3514f500f761b
       RELEASE_TAG: v0.3.0-m2-timing-test
-      PUBLIC_TEST_TAG: m2-image-lifetime-20261025
-      RELEASE_ASSET: InsaniquariumEnhanced-M2ImageLifetime-Win64.zip
+      PUBLIC_TEST_TAG: m2-coin-blend-20261025
+      RELEASE_ASSET: InsaniquariumEnhanced-M2CoinBlend-Win64.zip
     steps:
       - name: Checkout release workflow
         uses: actions/checkout@v4
@@ -282,6 +282,12 @@ jobs:
           python m2/apply_coin_sprite_trace.py
           if ($LASTEXITCODE -ne 0) { throw 'Coin sprite trace patch failed' }
 
+      - name: Add opt-in ordinary coin animation composition
+        shell: pwsh
+        run: |
+          python m2/apply_coin_animation.py
+          if ($LASTEXITCODE -ne 0) { throw 'Coin animation patch failed' }
+
       - name: Enable Esc pause-menu keyboard shortcut
         shell: pwsh
         run: |
@@ -319,6 +325,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Coin sprite trace regression test failed' }
           & "m2/tests/build/Release/M2ImageIdentityTest.exe"
           if ($LASTEXITCODE -ne 0) { throw 'Image lifetime regression test failed' }
+          & "m2/tests/build/Release/M2CoinAnimationTest.exe"
+          if ($LASTEXITCODE -ne 0) { throw 'Coin animation regression test failed' }
 
       - name: Generate missing libopenmpt version metadata
         shell: pwsh
@@ -415,6 +423,10 @@ jobs:
             smoke_compositing = 'premultiplied-pixels-v1'
             smoke_source_pixels = 'resident-only'
             coin_sprite_trace = 'silver-gold-requests-v2'
+            coin_animation_default = 'off'
+            coin_compositing = 'observed-adjacent-premultiplied-v1'
+            coin_pixel_guard = 'resident-row-equality-and-identity-v1'
+            coin_source_pixels = 'retain-money-only-when-enabled'
             coin_resource_generation = 'untracked'
             image_lifetime = 'process-unique-construction-and-assignment-v1'
             image_pixel_revision = 'bitschanged-notifications-only-v1'
@@ -458,6 +470,7 @@ jobs:
           @echo off
           cd /d "%~dp0"
           setlocal
+          set "INSANIQUARIUM_M2_COIN_BLEND=0"
           set "INSANIQUARIUM_M2_SMOKE_BLEND=0"
           set "INSANIQUARIUM_M2_60FPS=1"
           set "INSANIQUARIUM_M2_DEBUG=0"
@@ -467,6 +480,7 @@ jobs:
           @echo off
           cd /d "%~dp0"
           setlocal
+          set "INSANIQUARIUM_M2_COIN_BLEND=0"
           set "INSANIQUARIUM_M2_SMOKE_BLEND=0"
           set "INSANIQUARIUM_M2_60FPS=1"
           set "INSANIQUARIUM_M2_DEBUG=1"
@@ -479,6 +493,7 @@ jobs:
           setlocal
           cd /d "%~dp0"
           set "INSANIQUARIUM_M2_60FPS=1"
+          set "INSANIQUARIUM_M2_COIN_BLEND=0"
           set "INSANIQUARIUM_M2_SMOKE_BLEND=1"
           set "INSANIQUARIUM_M2_DEBUG=0"
           start "" "%~dp0InsaniquariumEnhanced.exe"
@@ -488,11 +503,34 @@ jobs:
           setlocal
           cd /d "%~dp0"
           set "INSANIQUARIUM_M2_60FPS=1"
+          set "INSANIQUARIUM_M2_COIN_BLEND=0"
           set "INSANIQUARIUM_M2_SMOKE_BLEND=1"
           set "INSANIQUARIUM_M2_DEBUG=1"
           start "" "%~dp0InsaniquariumEnhanced.exe"
           '@ | Set-Content -Path 'stage/Start M2 Smoke Blend Debug.cmd' -Encoding ascii
+          @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          set "INSANIQUARIUM_M2_60FPS=1"
+          set "INSANIQUARIUM_M2_COIN_BLEND=1"
+          set "INSANIQUARIUM_M2_SMOKE_BLEND=0"
+          set "INSANIQUARIUM_M2_DEBUG=0"
+          start "" "%~dp0InsaniquariumEnhanced.exe"
+          '@ | Set-Content -Path 'stage/Start M2 Coin Blend.cmd' -Encoding ascii
+          @'
+          @echo off
+          setlocal
+          cd /d "%~dp0"
+          set "INSANIQUARIUM_M2_60FPS=1"
+          set "INSANIQUARIUM_M2_COIN_BLEND=1"
+          set "INSANIQUARIUM_M2_SMOKE_BLEND=0"
+          set "INSANIQUARIUM_M2_DEBUG=1"
+          start "" "%~dp0InsaniquariumEnhanced.exe"
+          '@ | Set-Content -Path 'stage/Start M2 Coin Blend Debug.cmd' -Encoding ascii
           Copy-Item 'm2/analyze_logs.py' 'stage/AnalyzeM2Logs.py'
+          Copy-Item 'm2/coin_blend_audit.py' 'stage/coin_blend_audit.py'
+          Copy-Item 'm2/COIN_ANIMATION_TEST.md' 'stage/COIN_ANIMATION_TEST.md'
           Copy-Item 'm2/smoke_animation_audit.py' 'stage/smoke_animation_audit.py'
           Copy-Item 'm2/SMOKE_ANIMATION_TEST.md' 'stage/SMOKE_ANIMATION_TEST.md'
           Copy-Item 'm2/coin_sprite_audit.py' 'stage/coin_sprite_audit.py'
@@ -512,11 +550,13 @@ jobs:
           pause
           '@ | Set-Content -Path 'stage/Analyze M2 Logs.cmd' -Encoding ascii
           @'
-          INSANIQUARIUM ENHANCED M2 - COIN SPRITE RECORDING
+          INSANIQUARIUM ENHANCED M2 - COIN ANIMATION EXPERIMENT
 
           Debug launchers also record resolved silver/gold coin draw requests.
           See COIN_SPRITE_TRACE.md for capture steps and coverage limits.
 
+          Start M2 Coin Blend.cmd: additionally crossfade ordinary silver/gold coins.
+          See COIN_ANIMATION_TEST.md for scope, fallback reasons and comparison steps.
           Start M2.cmd: existing 60Hz presentation, original sprite animation.
           Start M2 Smoke Blend.cmd: additionally crossfade smoke types 6 and 7.
           Each has a Debug launcher for CSV capture. Close the game between runs.
@@ -537,7 +577,7 @@ jobs:
           $zip = Join-Path $PWD ('release/' + $env:RELEASE_ASSET)
           $entry = [System.IO.Compression.ZipFile]::OpenRead($zip)
           try {
-            foreach ($expected in @('InsaniquariumEnhanced.exe', 'BUILD_INFO.json', 'Start M2.cmd', 'Start M2 Debug.cmd', 'M2_README.txt', 'AnalyzeM2Logs.py', 'trace_integrity.py', 'Analyze M2 Logs.cmd', 'Start M2 Smoke Blend.cmd', 'Start M2 Smoke Blend Debug.cmd', 'smoke_animation_audit.py', 'SMOKE_ANIMATION_TEST.md', 'coin_sprite_audit.py', 'COIN_SPRITE_TRACE.md')) {
+            foreach ($expected in @('InsaniquariumEnhanced.exe', 'BUILD_INFO.json', 'Start M2.cmd', 'Start M2 Debug.cmd', 'M2_README.txt', 'AnalyzeM2Logs.py', 'trace_integrity.py', 'Analyze M2 Logs.cmd', 'Start M2 Smoke Blend.cmd', 'Start M2 Smoke Blend Debug.cmd', 'smoke_animation_audit.py', 'SMOKE_ANIMATION_TEST.md', 'coin_sprite_audit.py', 'COIN_SPRITE_TRACE.md', 'coin_blend_audit.py', 'COIN_ANIMATION_TEST.md', 'Start M2 Coin Blend.cmd', 'Start M2 Coin Blend Debug.cmd')) {
               if (-not ($entry.Entries.FullName -contains $expected)) {
                 throw "Release archive is missing $expected"
               }
@@ -549,8 +589,8 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: InsaniquariumEnhanced-M2ImageLifetime-Win64
-          path: release/InsaniquariumEnhanced-M2ImageLifetime-Win64.zip
+          name: InsaniquariumEnhanced-M2CoinBlend-Win64
+          path: release/InsaniquariumEnhanced-M2CoinBlend-Win64.zip
           if-no-files-found: error
           retention-days: 90
 
@@ -562,28 +602,25 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $notes = @'
-          ## M2 image lifetime diagnostics
+          ## M2 optional silver/gold coin animation
 
-          Silver/gold draw requests now include process-local image lifetime IDs
-          and explicit BitsChanged notification revisions. Construction, copying
-          and assignment receive fresh IDs, including reused memory addresses.
-          The analyzer detects changed image lifetimes and reported mutations,
-          alongside coin transitions, gaps and drawing-state changes.
-          Raw pixel writes can bypass notifications; full pixel continuity is
-          still untracked. Matching stamps never certify safe blending.
-          Older v1 coin recordings remain readable with unknown stamps explicit.
+          New Coin Blend launchers crossfade adjacent observed silver/gold cels
+          during the existing 60Hz presentation. Original 28ms simulation, RNG,
+          callbacks, animation counters and saved fields remain unchanged.
+          Coins and smoke blending are off in the baseline launcher.
 
-          Original draw calls, 28ms simulation and serialized fields are preserved.
-          No coin animation smoothing is enabled. The existing optional smoke
-          experiment remains off by default. Stable M1.2 remains unchanged.
+          The coin experiment checks owner state, image lifetime/revision and
+          exact resident row pixels. It retains IMAGE_MONEY CPU pixels only
+          when enabled; source texture recovery is never attempted.
+          Collection, fade, shell mode, pause/load, loops and unsupported state
+          use the original drawing. Stable M1.2 remains unchanged.
 
-          Run Start M2 Debug.cmd, collect silver/gold coins, let coins fade,
-          pause/resume and save/load. Use a separate short shell-mode recording.
-          Close the game and preserve all M2Debug*.csv files before another run.
-          See COIN_SPRITE_TRACE.md. Original game assets are required.
-
+          Compare Start M2.cmd and Start M2 Coin Blend.cmd. For a recording use
+          Start M2 Coin Blend Debug.cmd, then Analyze M2 Logs.cmd after closing.
+          See COIN_ANIMATION_TEST.md. Original game assets are required.
           Automated tests and Windows compilation do not establish runtime
-          appearance, audio fidelity or physical display pacing.
+          appearance, audio fidelity, gameplay performance or display pacing.
+          Crossfading may look soft; visual acceptance is pending.
           '@
           $notes | Set-Content -LiteralPath 'release/release-notes.md' -Encoding utf8
           $asset = Join-Path 'release' $env:RELEASE_ASSET
@@ -604,7 +641,7 @@ jobs:
           if ($lookupCode -eq 0) {
             throw 'Release tag already exists; use a new tag rather than replacing a published build.'
           } else {
-            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Image Lifetime Diagnostics (Experimental)' --notes-file 'release/release-notes.md' --prerelease 2>&1
+            $result = & gh release create $env:PUBLIC_TEST_TAG $asset --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title 'Insaniquarium Enhanced M2 - Coin Animation Blend (Experimental)' --notes-file 'release/release-notes.md' --prerelease 2>&1
             $code = $LASTEXITCODE
           }
           if ($code -ne 0) {

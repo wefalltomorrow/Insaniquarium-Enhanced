@@ -19,3 +19,4 @@ add_executable(M2SmokeAnimationTest test_smoke_animation.cpp)
 
 add_executable(M2CoinSpriteTraceTest test_coin_sprite.cpp)
 add_executable(M2ImageIdentityTest test_image_identity.cpp)
+add_executable(M2CoinAnimationTest test_coin_animation.cpp)

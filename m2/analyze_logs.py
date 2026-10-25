@@ -217,6 +217,12 @@ def analyze(folder: Path):
         report.append("")
         report.extend(coin_detail)
     notes.extend(coin_notes)
+    from coin_blend_audit import audit_coin_blend
+    blend_detail, blend_notes = audit_coin_blend(folder)
+    if blend_detail:
+        report.append("")
+        report.extend(blend_detail)
+    notes.extend(blend_notes)
     from smoke_animation_audit import audit_smoke_animation
     smoke_detail, smoke_notes = audit_smoke_animation(folder)
     if smoke_detail:

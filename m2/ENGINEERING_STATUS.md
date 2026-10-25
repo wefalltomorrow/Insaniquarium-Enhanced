@@ -5,6 +5,28 @@ historical stages and may contradict later implementations. Keep evidence levels
 separate: source, unit tests, Windows compilation, recorded runtime and visual
 user acceptance are different claims.
 
+## Optional ordinary coin composition (October 25, current development)
+
+The next runtime increment adds opt-in silver/gold cel composition. It records
+pre-update animation state and the complete selected resident pixel row, then
+blends only adjacent observed cels when state, layout, image identity/revision
+and exact row bytes agree. IMAGE_MONEY retains CPU pixels at load only in this
+mode. No source recovery or source pixel mutation is introduced. One output cel
+is drawn with the existing premultiplied pixel math. Default launchers disable
+coin blending explicitly; the smoke experiment remains separate.
+
+Collected/fading coins, shells, changed mode/speed, loops, pause, serialization,
+unsupported graphics and missing pixels/history fall back. A separate bounded
+M2DebugCoinBlend.csv records submitted compositions and fallback reasons.
+The analyzer reports counts without claiming visual acceptance. See
+COIN_ANIMATION_TEST.md for test steps and the CPU/GPU continuity limits.
+
+Local validation: 101 Python tests and 11 native C++ programs passed. Removing
+the marked additions and restoring the two original draws recovers every
+original nonblank Coin.cpp line; the resource change is only the conditional
+pixel retention and include. Full Windows CI and release verification follow.
+No new gameplay recording or visual acceptance evidence is available.
+
 ## Coin transition diagnostics (October 25)
 
 The analyzer now compares unique silver/gold requests in consecutive rendered
