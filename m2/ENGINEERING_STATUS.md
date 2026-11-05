@@ -1,4 +1,4 @@
-# M2 engineering handover â€” 25 October 2026
+# M2 engineering handover - 5 November 2026
 
 This is the current engineering status. Older appended README sections describe
 historical stages and may contradict later implementations. Keep evidence levels
@@ -23,8 +23,17 @@ immutability and explicitly rejects the obsolete five-row layout. Test
 pixels are synthetic; original artwork is not committed. Game update,
 save/load, draw-site patches and the pixel retention policy are unchanged.
 
-Fresh release target: m2-coin-layout-fix-20261105. Windows build and download
-verification are pending. Gameplay appearance and performance remain unverified.
+Verified release: m2-coin-layout-fix-20261105. Runtime commit
+90454ecdc2e462cc124edbeaa6dcf7c0d3e8e87e; successful Windows CI 42010131823.
+101 Python tests and 11 native C++ programs passed locally and in Windows CI.
+Independent old/new probes using dimensions from the recovered asset headers
+report layout rejection before the fix and 72x72 composition after it for both
+coin types. These probes use synthetic pixels, not gameplay.
+The downloaded 19-file package passed CRC, metadata, x64 executable, launcher
+and bundled-source checks. Its analyzer passed the historical capture and
+synthetic v1/v2/blend fixtures; input hashes and stable main are unchanged.
+ZIP SHA256: 90d3b4783d5740960c66d80259334bc1cc64ba80bdf68c63cf35ff7ee189933c.
+Gameplay appearance and performance remain unverified.
 The planned performance benchmark is deferred until this correctness fix ships.
 
 ## Optional ordinary coin composition (October 25, historical)
