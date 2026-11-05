@@ -35,9 +35,10 @@ template<class MemoryImage> class CoinAnimation {
     const char* captureReason = "history";
 
     static bool Layout(const MemoryImage* source) {
-        return source && source->mNumCols == 10 && source->mNumRows == 5 &&
+        // Original resources.xml declares MONEY as ten columns and six rows.
+        return source && source->mNumCols == 10 && source->mNumRows == 6 &&
                source->mWidth > 0 && source->mWidth <= 720 && source->mWidth % 10 == 0 &&
-               source->mHeight > 0 && source->mHeight <= 360 && source->mHeight % 5 == 0;
+               source->mHeight > 0 && source->mHeight <= 432 && source->mHeight % 6 == 0;
     }
 public:
     void Reset(const char* reason = "history") { valid = false; captureReason = reason; }
@@ -51,7 +52,7 @@ public:
         const auto id = source->mM2ImageIdentity.Lifetime();
         const auto rev = source->mM2ImageIdentity.ReportedRevision();
         if (!id || !rev) { captureReason = "identity"; return; }
-        const int count = source->mWidth * (source->mHeight / 5);
+        const int count = source->mWidth * (source->mHeight / 6);
         const auto* start = source->mBits + (state.type - 1) * count;
         try { rowPixels.assign(start, start + count); }
         catch (const std::bad_alloc&) { captureReason = "allocation"; return; }
@@ -83,7 +84,7 @@ public:
         if (!source->mBits) return reject("nonresident");
         if (source->mM2ImageIdentity.Lifetime() != lifetime ||
             source->mM2ImageIdentity.ReportedRevision() != revision) return reject("identity");
-        const int width = sheetWidth / 10, height = sheetHeight / 5;
+        const int width = sheetWidth / 10, height = sheetHeight / 6;
         const auto* currentRow = source->mBits + (state.type - 1) * sheetWidth * height;
         if (!std::equal(rowPixels.begin(), rowPixels.end(), currentRow)) return reject("pixels");
         if (mix == 0.0 || mix == 1.0) {

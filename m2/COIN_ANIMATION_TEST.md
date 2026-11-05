@@ -39,7 +39,7 @@ sprite-cel counts omit composed draws because those use one DrawImage call.
 - Off by default. The new launchers enable only the coin experiment; smoke
   blending remains off. All baseline/smoke launchers explicitly disable coins.
 - Only types 1/2, non-shell mode, unfaded/uncollected, normal unscaled untinted
-  drawing, a 10×5 sheet with cells at most 72×72, and adjacent observed cels.
+  drawing, a 10×6 sheet with cells at most 72×72, and adjacent observed cels.
   Timer wraps, cel 9→0, mode/speed changes, invalid state and missing history
   fall back. Reset/load/pause never reuses a previous interval's blend.
 - A CPU copy of the entire selected ten-cel row is captured before each original
@@ -58,4 +58,10 @@ sprite-cel counts omit composed draws because those use one DrawImage call.
   continuity. CI and synthetic traces do not establish appearance, audio,
   gameplay fidelity or physical display pacing. Visual acceptance is pending.
 
-Release tag: m2-coin-blend-20261025.
+Release tag: m2-coin-layout-fix-20261105.
+
+This corrects the five-row check in m2-coin-blend-20261025. The original
+resources.xml declares ten columns and six rows, and the recovered money.gif
+is 720×432 (72×72 per cel). The previous build rejected that layout and used
+ordinary drawing even with the experiment enabled. Tests now cover the actual
+dimensions and both silver/gold row offsets using synthetic pixels.

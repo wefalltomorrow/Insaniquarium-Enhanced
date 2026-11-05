@@ -5,7 +5,29 @@ historical stages and may contradict later implementations. Keep evidence levels
 separate: source, unit tests, Windows compilation, recorded runtime and visual
 user acceptance are different claims.
 
-## Optional ordinary coin composition (October 25, current development)
+## Coin asset layout correction (November 5, current development)
+
+Inspection of both recovered original asset sets found MONEY declared as
+10 columns and 6 rows in properties/resources.xml; both images/money.gif
+headers specify 720x432 pixels. The October 25 helper incorrectly required
+five rows. That release therefore falls back with reason layout for original
+assets, despite its passing synthetic five-row tests and Windows build.
+The earlier verification established packaging and compilation, not active
+coin composition on original assets.
+
+The helper now requires the actual six-row layout and divides row offsets
+and cell heights accordingly. Existing 72x72 cell limits remain. Native
+regression coverage exercises every output pixel in both silver/gold rows
+at 720x432, detects a change at the end of each full row, verifies source
+immutability and explicitly rejects the obsolete five-row layout. Test
+pixels are synthetic; original artwork is not committed. Game update,
+save/load, draw-site patches and the pixel retention policy are unchanged.
+
+Fresh release target: m2-coin-layout-fix-20261105. Windows build and download
+verification are pending. Gameplay appearance and performance remain unverified.
+The planned performance benchmark is deferred until this correctness fix ships.
+
+## Optional ordinary coin composition (October 25, historical)
 
 The next runtime increment adds opt-in silver/gold cel composition. It records
 pre-update animation state and the complete selected resident pixel row, then

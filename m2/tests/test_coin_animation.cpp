@@ -10,7 +10,7 @@ void Check(bool ok, const char* message) {
 }
 struct Image {
     ImageIdentity mM2ImageIdentity;
-    int mWidth=0, mHeight=0, mNumCols=10, mNumRows=5, mImageFlags=0, updates=0;
+    int mWidth=0, mHeight=0, mNumCols=10, mNumRows=6, mImageFlags=0, updates=0;
     std::uint32_t* mBits=nullptr;
     std::vector<std::uint32_t> bits;
     static inline bool fail=false, empty=false;
@@ -29,8 +29,8 @@ struct Graphics {
     void DrawImageCel(Image*, int a, int b, int c, int r) { ++draws; cel=c; row=r; x=a; y=b; }
 };
 int main() {
-    Image source; source.Create(20,10); source.mImageFlags=7;
-    for (int i=0; i<200; ++i) source.bits[i]=0xff000000 | (i * 7919);
+    Image source; source.Create(20,12); source.mImageFlags=7;
+    for (int i=0; i<240; ++i) source.bits[i]=0xff000000 | (i * 7919);
     const auto original=source.bits;
     CoinAnimationState prev{2,3,1,2}, now{2,4,2,2};
     CoinAnimation<Image> h; CoinBlendResult result{0,0};
@@ -80,13 +80,13 @@ int main() {
               "ineligible state always draws current cel");
     }
     for (int issue=0;issue<7;++issue) {
-        Image bad; bad.Create(20,10);
+        Image bad; bad.Create(20,12);
         if(issue==0) bad.mNumCols=9;
-        if(issue==1) bad.mNumRows=4;
+        if(issue==1) bad.mNumRows=5;
         if(issue==2) bad.mWidth=19;
         if(issue==3) bad.mHeight=9;
         if(issue==4) bad.mWidth=730;
-        if(issue==5) bad.mHeight=365;
+        if(issue==5) bad.mHeight=438;
         if(issue==6) bad.mBits=nullptr;
         h.Capture(true,prev,&bad);
         Check(!h.Prepare(true,false,true,now,&bad,0.5,result) && bad.reads==0,"layout/residency before pixel access");
@@ -110,6 +110,35 @@ int main() {
         }
     }
     Check(transitions==324,"both rows and speed cycles exercised");
+    // Real asset contract: both recovered resources.xml files declare 10x6;
+    // both money.gif headers are 720x432. Synthetic pixels avoid redistributing
+    // original artwork. Literal dimensions catch the previous five-row assumption.
+    Image actual; actual.Create(720,432); actual.mNumCols=10; actual.mNumRows=6;
+    for (std::size_t i=0;i<actual.bits.size();++i)
+        actual.bits[i]=0xff000000u | static_cast<std::uint32_t>((i*7919u)&0xffffffu);
+    const auto actualOriginal=actual.bits;
+    CoinAnimation<Image> realHistory;
+    for (int type : {1,2}) {
+        CoinAnimationState a{type,3,1,2}, b{type,4,2,2};
+        realHistory.Capture(true,a,&actual);
+        auto* image=realHistory.Prepare(true,false,true,b,&actual,0.5,result);
+        Check(image && image->mWidth==72 && image->mHeight==72,"real money dimensions compose 72px cels");
+        const int rowOffset=(type-1)*720*72;
+        for(int y=0;y<72;++y) for(int x=0;x<72;++x)
+            Check(image->bits[y*72+x]==BlendSmokePixel(
+                actual.bits[rowOffset+y*720+72+x],
+                actual.bits[rowOffset+y*720+144+x],128),
+                "real silver/gold row stride and complete output");
+        actual.bits[rowOffset+720*72-1]^=1;
+        Check(!realHistory.Prepare(true,false,true,b,&actual,0.5,result) &&
+              std::string(result.reason)=="pixels","real row final pixel invalidates blend");
+        actual.bits[rowOffset+720*72-1]^=1;
+    }
+    Check(actual.bits==actualOriginal && actual.reads==0 && actual.updates==0,"real source remains untouched");
+    actual.mNumRows=5; actual.mHeight=360;
+    realHistory.Capture(true,prev,&actual);
+    Check(!realHistory.Prepare(true,false,true,now,&actual,0.5,result) &&
+          std::string(result.reason)=="layout","old five-row fixture is rejected");
 #ifdef _WIN32
     _putenv_s("INSANIQUARIUM_M2_DEBUG","1");
 #else
