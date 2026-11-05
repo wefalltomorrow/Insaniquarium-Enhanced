@@ -25,11 +25,32 @@ case isolates the unchanged complete-row validation. An explicit memcmp trial
 did not show useful local improvement and was not retained. Memory payload
 remains 222.75 KiB per active owner, excluding framework/allocator overhead.
 
-Release candidate: m2-blend-performance-20261105. Local regression checks and
-paired benchmarks are being completed; Windows Release/MSVC comparison and
-independent downloaded-package verification are pending. See COIN_BENCHMARK.md.
-These measurements exclude GPU work and first allocation and are not gameplay
-FPS or visual acceptance evidence. Stable main remains protected.
+Verified release: m2-blend-performance-20261105, runtime commit
+2ffc9b61ef05492cf98f249996473c3031d2e879. Windows CI 42020559951 passed all
+101 Python tests, 12 native test programs and paired benchmark checks.
+The independently downloaded 22-file package passed CRC, digest, metadata,
+x64 executable, launcher and nine bundled-source checks. Its analyzer passed
+historical/v1/v2/blend fixtures with unchanged input hashes. Its benchmark ran
+locally and all 60 case checksums matched the local and Windows CI reports.
+ZIP SHA256: 8651d6c326e23c67ea33b29b33e001344acfc7b25208aefccf010602cc3e664d.
+
+Measured 128-owner transition batches (synthetic CPU helper only):
+
+| Environment | Synthetic profile | Before (ms) | After (ms) | Speed ratio |
+|---|---|---:|---:|---:|
+| Windows CI / MSVC | equal_partial | 7.055 | 4.504 | 1.57x |
+| Windows CI / MSVC | masked | 5.317 | 3.773 | 1.41x |
+| Windows CI / MSVC | mixed_alpha | 7.041 | 6.951 | 1.01x |
+| Windows CI / MSVC | opaque | 7.027 | 4.474 | 1.57x |
+| Local Zig 0.16 / Clang -O2 | equal_partial | 13.987 | 11.170 | 1.25x |
+| Local Zig 0.16 / Clang -O2 | masked | 12.302 | 10.939 | 1.12x |
+| Local Zig 0.16 / Clang -O2 | mixed_alpha | 13.810 | 13.241 | 1.04x |
+| Local Zig 0.16 / Clang -O2 | opaque | 13.585 | 11.166 | 1.22x |
+
+Full paired distributions are in the release's COIN_BENCHMARK_CI.json; see
+COIN_BENCHMARK.md for reproduction and limits. These measurements exclude
+GPU work and first allocation and are not gameplay FPS or visual acceptance
+evidence. Busy-tank gameplay testing remains open. Stable main is unchanged.
 
 ## Coin asset layout correction (November 5, verified predecessor)
 
