@@ -58,7 +58,11 @@ sprite-cel counts omit composed draws because those use one DrawImage call.
   continuity. CI and synthetic traces do not establish appearance, audio,
   gameplay fidelity or physical display pacing. Visual acceptance is pending.
 
-Release tag: m2-coin-layout-fix-20261105.
+Release tag: m2-blend-performance-20261105.
+
+Equal-opacity pixel blending now uses exact integer cancellation to avoid
+three variable divisions. Output matches the original pixel formula.
+See COIN_BENCHMARK.md for CPU measurements and their limits.
 
 This corrects the five-row check in m2-coin-blend-20261025. The original
 resources.xml declares ten columns and six rows, and the recovered money.gif

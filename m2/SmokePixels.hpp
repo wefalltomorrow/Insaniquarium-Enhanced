@@ -11,6 +11,18 @@ namespace EnhancedM2 {
 inline std::uint32_t BlendSmokePixel(std::uint32_t a, std::uint32_t b, unsigned w) {
     if (w == 0) return a;
     if (w >= 256) return b;
+    // Equal nonzero coverage cancels out of each channel division exactly.
+    // This includes opaque interiors; hidden RGB at zero coverage stays zero.
+    if ((a >> 24) == (b >> 24)) {
+        if (!(a >> 24)) return 0;
+        // Two 16-bit lanes cannot carry into each other: each weighted sum
+        // plus rounding is at most 255*256+128 = 65408.
+        const auto rb = ((a & 0x00ff00ffu) * (256 - w) +
+                         (b & 0x00ff00ffu) * w + 0x00800080u) >> 8;
+        const auto g = (((a >> 8) & 255) * (256 - w) +
+                        ((b >> 8) & 255) * w + 128) & 0xff00u;
+        return (a & 0xff000000u) | (rb & 0x00ff00ffu) | g;
+    }
     const unsigned aa = (a >> 24) * (256 - w), ab = (b >> 24) * w;
     const unsigned coverage = aa + ab;
     if (!coverage) return 0;

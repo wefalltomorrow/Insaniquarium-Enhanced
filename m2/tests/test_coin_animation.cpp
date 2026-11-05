@@ -133,6 +133,17 @@ int main() {
         Check(!realHistory.Prepare(true,false,true,b,&actual,0.5,result) &&
               std::string(result.reason)=="pixels","real row final pixel invalidates blend");
         actual.bits[rowOffset+720*72-1]^=1;
+        // Every byte lane, including unrelated cels and row boundaries, is
+        // guarded by the complete-row comparison, not just composed RGB pixels.
+        for(int offset : {0,71,72,719,720,25919,25920,51839}) {
+            for(unsigned lane=0;lane<4;++lane) {
+                realHistory.Capture(true,a,&actual);
+                actual.bits[rowOffset+offset]^=1u<<(8*lane);
+                Check(!realHistory.Prepare(true,false,true,b,&actual,0.5,result) &&
+                      std::string(result.reason)=="pixels","complete row byte-lane guard");
+                actual.bits[rowOffset+offset]^=1u<<(8*lane);
+            }
+        }
     }
     Check(actual.bits==actualOriginal && actual.reads==0 && actual.updates==0,"real source remains untouched");
     actual.mNumRows=5; actual.mHeight=360;

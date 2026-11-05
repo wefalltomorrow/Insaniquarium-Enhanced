@@ -5,7 +5,33 @@ historical stages and may contradict later implementations. Keep evidence levels
 separate: source, unit tests, Windows compilation, recorded runtime and visual
 user acceptance are different claims.
 
-## Coin asset layout correction (November 5, current development)
+## Blend performance milestone (November 5, current development)
+
+The equal-opacity pixel path cancels coverage exactly and uses two independent
+16-bit lanes for red/blue. It preserves the prior integer rounding and hidden
+transparent-color behavior. Other opacity pairs retain the original formula.
+This helper is shared by the opt-in coin and smoke experiments. No game update,
+save/load, callback, RNG, source-retention or coin-history guard changes.
+
+An independent 64-bit rational reference checks 67,371,011 pixel pairs: every
+opacity pair and weight plus exhaustive channel pairs/weights at three equal
+opacities. Additional coin regression checks mutate each byte lane at row/cel
+boundaries and the middle, including cels not being composed.
+
+A reproducible CPU benchmark covers both coin rows, four synthetic opacity
+profiles, 1/32/128 owners and capture/transition/endpoint/held/disabled paths.
+Three paired runs alternate order and compare output checksums. The endpoint
+case isolates the unchanged complete-row validation. An explicit memcmp trial
+did not show useful local improvement and was not retained. Memory payload
+remains 222.75 KiB per active owner, excluding framework/allocator overhead.
+
+Release candidate: m2-blend-performance-20261105. Local regression checks and
+paired benchmarks are being completed; Windows Release/MSVC comparison and
+independent downloaded-package verification are pending. See COIN_BENCHMARK.md.
+These measurements exclude GPU work and first allocation and are not gameplay
+FPS or visual acceptance evidence. Stable main remains protected.
+
+## Coin asset layout correction (November 5, verified predecessor)
 
 Inspection of both recovered original asset sets found MONEY declared as
 10 columns and 6 rows in properties/resources.xml; both images/money.gif
